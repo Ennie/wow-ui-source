@@ -101,6 +101,7 @@ local haveResponse = false;		-- true if we got a GM response to a previous ticke
 local needResponse = true;		-- true if we want a GM to contact us when we open a new ticket (Note:  This flag is always true right now)
 local needMoreHelp = false;
 
+local kbsetupLoaded = false;
 
 --
 -- HelpFrame
@@ -130,11 +131,25 @@ function HelpFrame_OnShow(self)
 	UpdateMicroButtons();
 	PlaySound("igCharacterInfoOpen");
 	GetGMStatus();
+	-- hearthstone button events
+	local button = HelpFrameCharacterStuckHearthstone;
+	button:RegisterEvent("BAG_UPDATE_COOLDOWN");
+	button:RegisterEvent("BAG_UPDATE");
+	button:RegisterEvent("SPELL_UPDATE_USABLE");
+	button:RegisterEvent("SPELL_UPDATE_COOLDOWN");
+	button:RegisterEvent("CURRENT_SPELL_CAST_CHANGED");	
 end
 
 function HelpFrame_OnHide(self)
 	PlaySound("igCharacterInfoClose");
 	UpdateMicroButtons();
+	-- hearthstone button events
+	local button = HelpFrameCharacterStuckHearthstone;
+	button:UnregisterEvent("BAG_UPDATE_COOLDOWN");
+	button:UnregisterEvent("BAG_UPDATE");
+	button:UnregisterEvent("SPELL_UPDATE_USABLE");
+	button:UnregisterEvent("SPELL_UPDATE_COOLDOWN");
+	button:UnregisterEvent("CURRENT_SPELL_CAST_CHANGED");
 end
 
 function HelpFrame_OnEvent(self, event, ...)
@@ -590,7 +605,6 @@ function KnowledgeBase_OnLoad(self)
 	self.scrollFrame.update = KnowledgeBase_UpdateArticles;
 	self.scrollFrame.scrollBar.doNotHide = true;
 	HybridScrollFrame_CreateButtons(self.scrollFrame, "KnowledgeBaseArticleTemplate", 8, -3, "TOPLEFT", "TOPLEFT", 0, -3);
-	self.loaded = 0;
 	
 	--Scroll Frame 2
 	self.scrollFrame2.child:SetWidth(self.scrollFrame2:GetWidth());	
@@ -601,7 +615,7 @@ end
 
 
 function KnowledgeBase_OnShow(self)
-	if ( self.loaded == 0 ) then
+	if ( not kbsetupLoaded ) then
 		KnowledgeBase_GotoTopIssues();
 	end
 end
@@ -609,19 +623,11 @@ end
 
 function KnowledgeBase_OnEvent(self, event, ...)
 	if ( event ==  "KNOWLEDGE_BASE_SETUP_LOAD_SUCCESS") then
-		self.loaded = 1;
-		local totalArticleHeaderCount = KBSetup_GetTotalArticleCount();
-
-		if ( totalArticleHeaderCount > 0 ) then
-			self.totalArticleCount = totalArticleHeaderCount;
-			self.dataFunc = KBSetup_GetArticleHeaderData;
-			KnowledgeBase_UpdateArticles();
-		else
-			KnowledgeBase_ShowErrorFrame(self, KBASE_ERROR_NO_RESULTS);
-		end
+		kbsetupLoaded = true;
+		KnowledgeBase_SnapToTopIssues();
 	elseif ( event ==  "KNOWLEDGE_BASE_SETUP_LOAD_FAILURE" ) then
 		KnowledgeBase_ShowErrorFrame(self, KBASE_ERROR_LOAD_FAILURE);
-		self.loaded = 0;
+		kbsetupLoaded = false;
 	elseif ( event == "KNOWLEDGE_BASE_QUERY_LOAD_SUCCESS" ) then
 		local totalArticleHeaderCount = KBQuery_GetTotalArticleCount();
 
@@ -630,6 +636,7 @@ function KnowledgeBase_OnEvent(self, event, ...)
 			self.totalArticleCount = totalArticleHeaderCount;
 			self.dataFunc = KBQuery_GetArticleHeaderData;
 			KnowledgeBase_UpdateArticles();
+			KnowledgeBase_HideErrorFrame(self, KBASE_ERROR_NO_RESULTS);
 		else
 			KnowledgeBase_ShowErrorFrame(self, KBASE_ERROR_NO_RESULTS);
 		end
@@ -803,6 +810,12 @@ end
 
 
 function KnowledgeBase_DisplayCategories()
+	if( not kbsetupLoaded ) then
+		--never loaded the setup so load setup and go to top issues.
+		KnowledgeBase_GotoTopIssues(); 
+		return;
+	end
+
 	local self = HelpFrame.kbase;
 	local scrollFrame = self.scrollFrame;
 	local offset = HybridScrollFrame_GetOffset(scrollFrame);
@@ -921,13 +934,31 @@ function KnowledgeBase_ShowErrorFrame(self, message)
 	self.errorFrame:Show();
 end
 
+function KnowledgeBase_HideErrorFrame(self, message)
+	if ( self.errorFrame.text:GetText() == message ) then
+		self.errorFrame:Hide();
+	end
+end
 
 ---------------Kbase button functions--------------
 ---------------Kbase button functions--------------
 ---------------Kbase button functions--------------
 function KnowledgeBase_SnapToTopIssues()
 	KnowledgeBase_Clearlist();
-	KBSetup_BeginLoading(KBASE_NUM_ARTICLES_PER_PAGE, 0);
+	if( kbsetupLoaded ) then
+		local totalArticleHeaderCount = KBSetup_GetTotalArticleCount();
+
+		if ( totalArticleHeaderCount > 0 ) then
+			HelpFrame.kbase.totalArticleCount = totalArticleHeaderCount;
+			HelpFrame.kbase.dataFunc = KBSetup_GetArticleHeaderData;
+			KnowledgeBase_UpdateArticles();
+			KnowledgeBase_HideErrorFrame(HelpFrame.kbase, KBASE_ERROR_NO_RESULTS);
+		else
+			KnowledgeBase_ShowErrorFrame(HelpFrame.kbase, KBASE_ERROR_NO_RESULTS);
+		end
+	else
+		KBSetup_BeginLoading(KBASE_NUM_ARTICLES_PER_PAGE, 0);
+	end
 end
 
 function KnowledgeBase_GotoTopIssues()
@@ -938,7 +969,7 @@ function KnowledgeBase_GotoTopIssues()
 		OnClick = KnowledgeBase_SnapToTopIssues,
 	}
 	NavBar_AddButton(HelpFrame.kbase.navBar, buttonData);
-	KBSetup_BeginLoading(KBASE_NUM_ARTICLES_PER_PAGE, 0);
+	KnowledgeBase_SnapToTopIssues();
 end
 
 
@@ -996,6 +1027,4 @@ function KnowledgeBase_ClearSearch(self)
 	self:GetParent().searchButton:Disable();
 	HelpFrame.kbase.hasSearch = false;
 end
-
-
 
