@@ -7,6 +7,18 @@ MacOptionsFrameCheckButtons["MOVIE_RECORDING_ENABLE_RECOVER"] = { index = 5, cva
 MacOptionsFrameCheckButtons["MOVIE_RECORDING_ENABLE_COMPRESSION"] = { index = 6, cvar = "MovieRecordingAutoCompress", tooltipText = MOVIE_RECORDING_ENABLE_COMPRESSION_TOOLTIP};
 MacOptionsFrameCheckButtons["ITUNES_SHOW_FEEDBACK"] = { index = 7, cvar = "iTunesRemoteFeedback", tooltipText = ITUNES_SHOW_FEEDBACK_TOOLTIP};
 MacOptionsFrameCheckButtons["ITUNES_SHOW_ALL_TRACK_CHANGES"] = { index = 8, cvar = "iTunesTrackDisplay", tooltipText = ITUNES_SHOW_ALL_TRACK_CHANGES_TOOLTIP};
+MacOptionsFrameCheckButtons["MAC_DISABLE_OS_SHORTCUTS"] = { index = 9, cvar = "MacDisableOsShortcuts", tooltipText = MAC_DISABLE_OS_SHORTCUTS_TOOLTIP};
+MacOptionsFrameCheckButtons["MAC_SWAP_CONTROL_AND_COMMAND"] = { index = 10, cvar = "MacSwapControlAndCommand", tooltipText = MAC_SWAP_CONTROL_AND_COMMAND_TOOLTIP};
+
+local function MovieRecordingSupported()
+	if (not IsMacClient()) then
+		return false;
+	elseif (not MovieRecording_IsSupported()) then
+		return false;
+	else
+		return true;
+	end
+end
 
 function MacOptionsFrame_OnLoad(self)
 	if(IsMacClient()) then
@@ -83,7 +95,7 @@ function MacOptionsFrame_Load()
 			MacOptionsFrame_DisableCheckBox(_G["MacOptionsFrameCheckButton3"]);
 		end
 	end
-	if(not MovieRecording_IsCursorRecordingSupported()) then
+	if(not MovieRecordingSupported() or not MovieRecording_IsCursorRecordingSupported()) then
 		local button = _G["MacOptionsFrameCheckButton3"];
 		button:SetChecked(0);
 		MacOptionsFrame_DisableCheckBox(button);
@@ -94,7 +106,23 @@ function MacOptionsFrame_Load()
 		MacOptionsFrameCheckButton3:SetChecked(0);
 		MacOptionsFrame_DisableCheckBox(MacOptionsFrameCheckButton3);		
 	end
-
+	
+	local disableOSShortcutsButton = _G["MacOptionsFrameCheckButton9"];
+	disableOSShortcutsButton.setFunc = function(checked)
+		if ( (not MacOptions_IsUniversalAccessEnabled()) and (checked == "1")  ) then
+			StaticPopup_Show("MAC_OPEN_UNIVERSAL_ACCESS");
+			HideUIPanel(MacOptionsFrame);
+			HideUIPanel(GameMenuFrame);
+			_G["MacOptionsFrameCheckButton9"]:SetChecked(0);
+		else
+			MacOptions_SetOSShortcutsDisabled(checked == "1");
+		end
+	end;
+	
+	if ( (not MacOptions_IsUniversalAccessEnabled()) and disableOSShortcutsButton:GetChecked() ) then
+		disableOSShortcutsButton:SetChecked(0);
+		SetCVar("MacDisableOSShortcuts", "0");
+	end
 end
 
 function MacOptionsFrame_Save()
@@ -127,7 +155,7 @@ function MacOptionsFrame_Cancel()
 end
 
 function MacOptionsFrameResolutionDropDown_OnLoad(self)
-	if ( not IsMacClient() ) then
+	if (not MovieRecordingSupported()) then
 		return;
 	end
 	local ratio, width;
@@ -259,6 +287,10 @@ function MacOptionsFrameCodecDropDown_OnLoad(self)
 end
 
 function MacOptionsFrameCodecDropDown_Initialize()
+	if (not MovieRecordingSupported()) then
+		return;
+	end
+	
 	local info = UIDropDownMenu_CreateInfo();
 	info.func = MacOptionsFrameCodecDropDown_OnClick;
 	info.checked = nil;
@@ -308,16 +340,18 @@ function MacOptionsFrame_SetDefaults()
 		MacOptionsFrame_EnableCheckBox(button);
 	end
 
-	UIDropDownMenu_Initialize(MacOptionsFrameFramerateDropDown, MacOptionsFrameFramerateDropDown_Initialize);
-	UIDropDownMenu_SetSelectedValue(MacOptionsFrameFramerateDropDown, "29.97");
-	UIDropDownMenu_Initialize(MacOptionsFrameCodecDropDown, MacOptionsFrameCodecDropDown_Initialize);
-	UIDropDownMenu_SetSelectedValue(MacOptionsFrameCodecDropDown, 1635148593);
-	UIDropDownMenu_Initialize(MacOptionsFrameResolutionDropDown, MacOptionsFrameResolutionDropDown_Initialize);
-	local ratio = MovieRecording_GetAspectRatio();
-	UIDropDownMenu_SetSelectedValue(MacOptionsFrameResolutionDropDown, "640x"..floor(640*ratio));
-	
-	MacOptionsFrameQualitySlider:SetValue(2);
-	MacOptionsFrame_UpdateTime();
+	if (MovieRecordingSupported()) then
+		UIDropDownMenu_Initialize(MacOptionsFrameFramerateDropDown, MacOptionsFrameFramerateDropDown_Initialize);
+		UIDropDownMenu_SetSelectedValue(MacOptionsFrameFramerateDropDown, "29.97");
+		UIDropDownMenu_Initialize(MacOptionsFrameCodecDropDown, MacOptionsFrameCodecDropDown_Initialize);
+		UIDropDownMenu_SetSelectedValue(MacOptionsFrameCodecDropDown, 1635148593);
+		UIDropDownMenu_Initialize(MacOptionsFrameResolutionDropDown, MacOptionsFrameResolutionDropDown_Initialize);
+		local ratio = MovieRecording_GetAspectRatio();
+		UIDropDownMenu_SetSelectedValue(MacOptionsFrameResolutionDropDown, "640x"..floor(640*ratio));
+		
+		MacOptionsFrameQualitySlider:SetValue(2);
+		MacOptionsFrame_UpdateTime();
+	end
 end
 
 function MacOptionsFrame_DisableCheckBox(checkBox)
@@ -340,6 +374,9 @@ function MacOptionsFrame_EnableCheckBox(checkBox, setChecked, checked, isWhite)
 end
 
 function MacOptionsFrame_UpdateTime()
+	if(not MovieRecording_IsSupported()) then
+		return;
+	end
 	local resolution, framerate, xIndex, width, sound;
 	framerate = UIDropDownMenu_GetSelectedValue(MacOptionsFrameFramerateDropDown);
 	if tonumber(framerate) >= 10 then

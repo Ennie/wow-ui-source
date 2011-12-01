@@ -1,25 +1,34 @@
 SHARD_BAR_NUM_SHARDS = 3;
 SHARDBAR_SHOW_LEVEL = 10;
 
-
-function ShardBar_ToggleShard(self, visible)
-	if visible then
-		self.animOut:Play();
+function ShardBar_SetShard(self, active)
+	if ( active ) then
+		if (self.animOut:IsPlaying()) then
+			self.animOut:Stop();
+		end
+		
+		if (not self.active and not self.animIn:IsPlaying()) then
+			self.animIn:Play();
+			self.active = true;
+		end
 	else
-		self.animIn:Play();
+		if (self.animIn:IsPlaying()) then
+			self.animIn:Stop();
+		end
+		
+		if (self.active and not self.animOut:IsPlaying()) then
+			self.animOut:Play();
+			self.active = false;
+		end
 	end
 end
-
 
 function ShardBar_Update()
 	local numShards = UnitPower( ShardBarFrame:GetParent().unit, SPELL_POWER_SOUL_SHARDS );
 	for i=1,SHARD_BAR_NUM_SHARDS do
 		local shard = _G["ShardBarFrameShard"..i];
-		local isShown = shard.shardFill:IsVisible() == 1;
 		local shouldShow = i <= numShards;
-		if isShown ~= shouldShow then 
-			ShardBar_ToggleShard(shard, isShown);
-		end
+		ShardBar_SetShard(shard, shouldShow);
 	end
 end
 
@@ -34,7 +43,7 @@ function ShardBar_OnLoad (self)
 		self:SetAlpha(0);
 	end
 	
-	self:RegisterEvent("UNIT_POWER");
+	self:RegisterEvent("UNIT_POWER_FREQUENT");
 	self:RegisterEvent("PLAYER_ENTERING_WORLD");
 	self:RegisterEvent("UNIT_DISPLAYPOWER");
 end
@@ -45,7 +54,7 @@ function ShardBar_OnEvent (self, event, arg1, arg2)
 		ShardBar_Update();	
 	elseif ( event=="PLAYER_ENTERING_WORLD" ) then
 		ShardBar_Update();	
-	elseif ( (event == "UNIT_POWER") and (arg1 == self:GetParent().unit) ) then
+	elseif ( (event == "UNIT_POWER_FREQUENT") and (arg1 == self:GetParent().unit) ) then
 		if ( arg2 == "SOUL_SHARDS" ) then
 			ShardBar_Update();
 		end

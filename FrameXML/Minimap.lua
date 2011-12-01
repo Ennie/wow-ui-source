@@ -5,6 +5,13 @@ MINIMAP_BOTTOM_EDGE_EXTENT = 192;	-- pixels from the top of the screen to the bo
 MINIMAP_RECORDING_INDICATOR_ON = false;
 
 MINIMAP_EXPANDER_MAXSIZE = 28;
+HUNTER_TRACKING = 1;
+TOWNSFOLK = 2;
+
+LFG_EYE_TEXTURES = { };
+LFG_EYE_TEXTURES["default"] = { file = "Interface\\LFGFrame\\LFG-Eye", width = 512, height = 256, frames = 29, iconSize = 64, delay = 0.1 };
+LFG_EYE_TEXTURES["raid"] = { file = "Interface\\LFGFrame\\LFR-Anim", width = 256, height = 256, frames = 16, iconSize = 64, delay = 0.05 };
+LFG_EYE_TEXTURES["unknown"] = { file = "Interface\\LFGFrame\\WaitAnim", width = 128, height = 128, frames = 4, iconSize = 64, delay = 0.25 };
 
 function Minimap_OnLoad(self)
 	self.fadeOut = nil;
@@ -155,7 +162,8 @@ function Minimap_ZoomOut()
 end
 
 function EyeTemplate_OnUpdate(self, elapsed)
-	AnimateTexCoords(self.texture, 512, 256, 64, 64, 29, elapsed, 0.1)
+	local textureInfo = LFG_EYE_TEXTURES[self.queueType];
+	AnimateTexCoords(self.texture, textureInfo.width, textureInfo.height, textureInfo.iconSize, textureInfo.iconSize, textureInfo.frames, elapsed, textureInfo.delay)
 end
 
 function EyeTemplate_StartAnimating(eye)
@@ -167,18 +175,53 @@ function EyeTemplate_StopAnimating(eye)
 	if ( eye.texture.frame ) then
 		eye.texture.frame = 1;	--To start the animation over.
 	end
-	eye.texture:SetTexCoord(0, 0.125, 0, .25);
+	local textureInfo = LFG_EYE_TEXTURES[eye.queueType];
+	eye.texture:SetTexCoord(0, textureInfo.iconSize / textureInfo.width, 0, textureInfo.iconSize / textureInfo.height);
 end
 
-function MiniMapLFG_UpdateIsShown()
+function MiniMapLFG_Update()
 	local mode, submode = GetLFGMode();
 	if ( mode ) then
+		local queueType;
+		if ( mode == "queued" and not GetLFGQueueStats() ) then
+			queueType = "unknown";
+		else
+			queueType = GetLFGModeType();
+		end
+		if ( queueType ~= MiniMapLFGFrame.eye.queueType ) then
+			local eye = MiniMapLFGFrame.eye;
+			if ( eye.queueType ) then
+				eye.texture.frame = nil;			-- to clear saved animation settings
+				EyeTemplate_StopAnimating(eye);
+			end
+			eye.texture:SetTexture(LFG_EYE_TEXTURES[queueType].file);
+			eye.queueType = queueType;
+			EyeTemplate_StopAnimating(eye);			-- to set icon to the first frame
+			local frameLevel = MiniMapLFGFrame:GetFrameLevel();
+			if ( eye:GetFrameLevel() >= frameLevel ) then
+				eye:SetFrameLevel(frameLevel - 1);
+			end
+		end
 		MiniMapLFGFrame:Show();
-		if ( mode == "queued" or mode == "listed" or mode == "rolecheck" ) then
+		if ( mode == "queued" or mode == "listed" or mode == "rolecheck" or mode == "suspended" ) then
 			EyeTemplate_StartAnimating(MiniMapLFGFrame.eye);
 		else
 			EyeTemplate_StopAnimating(MiniMapLFGFrame.eye);
 		end
+
+		if ( mode == "lfgparty" or mode == "abandonedInDungeon" ) then
+			local name, typeID, subtypeID, minLevel, maxLevel, recLevel, minRecLevel, maxRecLevel, expansionLevel, groupID, textureFilename, difficulty, maxPlayers, description, isHoliday = GetLFGDungeonInfo(GetPartyLFGID());
+			local numPlayers = max(GetNumPartyMembers() + 1, GetNumRaidMembers());
+			if ( numPlayers < maxPlayers ) then
+				MiniMapLFGFrame.groupSize:Show();
+				MiniMapLFGFrame.groupSize:SetText(numPlayers);
+			else
+				MiniMapLFGFrame.groupSize:Hide();
+			end
+		else
+			MiniMapLFGFrame.groupSize:Hide();
+		end
+
 	else
 		MiniMapLFGFrame:Hide();
 	end
@@ -222,7 +265,7 @@ function MiniMapLFGFrameDropDown_Update()
 		info.text = LEAVE_QUEUE;
 		info.func = RejectProposal;
 		UIDropDownMenu_AddButton(info);
-	elseif ( mode == "queued" ) then
+	elseif ( mode == "queued" or mode == "suspended" ) then
 		info.text = LEAVE_QUEUE;
 		info.func = LeaveLFG;
 		info.disabled = (submode == "unempowered");
@@ -257,49 +300,93 @@ function MiniMapLFGFrame_OnClick(self, button)
 		end
 		ToggleDropDownMenu(1, nil, MiniMapLFGFrameDropDown, "MiniMapLFGFrame", 0, yOffset);
 	elseif ( mode == "proposal" ) then
-		if ( not LFDDungeonReadyPopup:IsShown() ) then
+		if ( not LFGDungeonReadyPopup:IsShown() ) then
 			PlaySound("igCharacterInfoTab");
-			StaticPopupSpecial_Show(LFDDungeonReadyPopup);
+			StaticPopupSpecial_Show(LFGDungeonReadyPopup);
 		end
-	elseif ( mode == "queued" or mode == "rolecheck" ) then
-		ToggleLFDParentFrame();
+	elseif ( mode == "queued" or mode == "rolecheck" or mode == "suspended" ) then
+		local inParty, joined, queued, noPartialClear, achievements, lfgComment, slotCount, isRaidFinder = GetLFGInfoServer();
+		if ( isRaidFinder ) then
+			ToggleRaidFrame(1);
+		else
+			ToggleLFDParentFrame();
+		end
 	elseif ( mode == "listed" ) then
-		ToggleLFRParentFrame();
+		ToggleFriendsFrame(4);
 	end
 end
 
 function MiniMapLFGFrame_OnEnter(self)
 	local mode, submode = GetLFGMode();
+	local queueType = GetLFGModeType();
 	if ( mode == "queued" ) then
-		LFDSearchStatus:Show();
+		LFGSearchStatus:Show();
 	elseif ( mode == "proposal" ) then
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-		GameTooltip:SetText(LOOKING_FOR_DUNGEON);
+		if ( queueType == "raid" ) then
+			GameTooltip:SetText(RAID_FINDER);
+		else
+			GameTooltip:SetText(LOOKING_FOR_DUNGEON);
+		end
 		GameTooltip:AddLine(DUNGEON_GROUP_FOUND_TOOLTIP, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, 1);
 		GameTooltip:AddLine(" ");
 		GameTooltip:AddLine(CLICK_HERE_FOR_MORE_INFO, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, 1);
 		GameTooltip:Show();
 	elseif ( mode == "rolecheck" ) then
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-		GameTooltip:SetText(LOOKING_FOR_DUNGEON);
+		if ( queueType == "raid" ) then
+			GameTooltip:SetText(RAID_FINDER);
+		else
+			GameTooltip:SetText(LOOKING_FOR_DUNGEON);
+		end
 		GameTooltip:AddLine(ROLE_CHECK_IN_PROGRESS_TOOLTIP, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, 1);
 		GameTooltip:Show();
 	elseif ( mode == "listed" ) then
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-		GameTooltip:SetText(LOOKING_FOR_RAID);
+		if ( queueType == "raid" ) then
+			GameTooltip:SetText(LOOKING_FOR_RAID);
+		else
+			GameTooltip:SetText(LOOKING_FOR_DUNGEON);
+		end
 		GameTooltip:AddLine(YOU_ARE_LISTED_IN_LFR, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, 1);
 		GameTooltip:Show();
 	elseif ( mode == "lfgparty" ) then
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-		GameTooltip:SetText(LOOKING_FOR_DUNGEON);
+		if ( queueType == "raid" ) then
+			GameTooltip:SetText(RAID_FINDER);
+		else
+			GameTooltip:SetText(LOOKING_FOR_DUNGEON);
+		end
 		GameTooltip:AddLine(YOU_ARE_IN_DUNGEON_GROUP, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, 1);
+
+		local dungeonID = GetPartyLFGID();
+		local numEncounters, numCompleted = GetLFGDungeonNumEncounters(dungeonID);
+		if ( numCompleted > 0 ) then
+			GameTooltip:AddLine(" ");
+			GameTooltip:AddLine(ERR_LOOT_GONE);
+			for i=1, numEncounters do
+				local bossName, texture, isKilled = GetLFGDungeonEncounterInfo(dungeonID, i);
+				if ( isKilled ) then
+					GameTooltip:AddLine(bossName, RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b);
+				end
+			end
+		end
+		GameTooltip:Show();
+	elseif ( mode == "suspended" ) then
+		GameTooltip:SetOwner(self, "ANCHOR_LEFT");
+		if ( queueType == "raid" ) then
+			GameTooltip:SetText(RAID_FINDER);
+		else
+			GameTooltip:SetText(LOOKING_FOR_DUNGEON);
+		end
+		GameTooltip:AddLine(IN_LFG_QUEUE_BUT_SUSPENDED, nil, nil, nil, 1);
 		GameTooltip:Show();
 	end
 end
 
 function MiniMapLFGFrame_OnLeave(self)
 	GameTooltip:Hide();
-	LFDSearchStatus:Hide();
+	LFGSearchStatus:Hide();
 end
 
 function MinimapButton_OnMouseDown(self, button)
@@ -365,7 +452,7 @@ function MinimapMailFrameUpdate()
 end
 
 function MiniMapTracking_Update()
-	UIDropDownMenu_Refresh(MiniMapTrackingDropDown);
+	UIDropDownMenu_RefreshAll(MiniMapTrackingDropDown);
 end
 
 function MiniMapTrackingDropDown_OnLoad(self)
@@ -395,24 +482,54 @@ function MiniMapTrackingDropDown_IsNoTrackingActive()
 	return true;
 end
 
-function MiniMapTrackingDropDown_Initialize()
-	local name, texture, active, category;
+function MiniMapTrackingDropDown_Initialize(self, level)
+	local name, texture, active, category, nested, numTracking;
 	local count = GetNumTrackingTypes();
 	local info;
+	local _, class = UnitClass("player");
 	
-	info = UIDropDownMenu_CreateInfo();
-	info.text=MINIMAP_TRACKING_NONE;
-	info.checked = MiniMapTrackingDropDown_IsNoTrackingActive;
-	info.func = ClearAllTracking;
-	info.icon = nil;
-	info.arg1 = nil;
-	info.isNotRadio = true;
-	info.keepShownOnClick = true;
-	UIDropDownMenu_AddButton(info);
-	
-	for id=1, count do
-		name, texture, active, category  = GetTrackingInfo(id);
+	if (level == 1) then 
+		info = UIDropDownMenu_CreateInfo();
+		info.text=MINIMAP_TRACKING_NONE;
+		info.checked = MiniMapTrackingDropDown_IsNoTrackingActive;
+		info.func = ClearAllTracking;
+		info.icon = nil;
+		info.arg1 = nil;
+		info.isNotRadio = true;
+		info.keepShownOnClick = true;
+		UIDropDownMenu_AddButton(info, level);
+		
+		if (class == "HUNTER") then --only show hunter dropdown for hunters
+			numTracking = 0;
+			-- make sure there are at least two options in dropdown
+			for id=1, count do
+				name, texture, active, category, nested = GetTrackingInfo(id);
+				if (nested == HUNTER_TRACKING and category == "spell") then
+					numTracking = numTracking + 1;
+				end
+			end
+			if (numTracking > 1) then 
+				info.text = HUNTER_TRACKING_TEXT;
+				info.func =  nil;
+				info.notCheckable = true;
+				info.keepShownOnClick = false;
+				info.hasArrow = true;
+				info.value = 1;
+				UIDropDownMenu_AddButton(info, level)
+			end
+		end
+		
+		info.text = TOWNSFOLK_TRACKING_TEXT;
+		info.func =  nil;
+		info.notCheckable = true;
+		info.keepShownOnClick = false;
+		info.hasArrow = true;
+		info.value = 2;
+		UIDropDownMenu_AddButton(info, level)
+	end
 
+	for id=1, count do
+		name, texture, active, category, nested  = GetTrackingInfo(id);
 		info = UIDropDownMenu_CreateInfo();
 		info.text = name;
 		info.checked = MiniMapTrackingDropDownButton_IsActive;
@@ -432,8 +549,16 @@ function MiniMapTrackingDropDown_Initialize()
 			info.tCoordTop = 0;
 			info.tCoordBottom = 1;
 		end
-		UIDropDownMenu_AddButton(info);
+		if (level == 1 and 
+			(nested < 0 or -- this tracking shouldn't be nested
+			(nested == HUNTER_TRACKING and class ~= "HUNTER") or 
+			(numTracking == 1 and category == "spell"))) then -- this is a hunter tracking ability, but you only have one
+			UIDropDownMenu_AddButton(info, level);
+		elseif (level == 2 and (nested == TOWNSFOLK or (nested == HUNTER_TRACKING and class == "HUNTER")) and nested == UIDROPDOWNMENU_MENU_VALUE) then
+			UIDropDownMenu_AddButton(info, level);
+		end
 	end
+	
 end
 
 function MiniMapTrackingShineFadeIn()
@@ -580,6 +705,9 @@ function GuildInstanceDifficulty_OnEnter(self)
 	elseif ( xpMultiplier > 1 ) then
 		GameTooltip:AddLine(string.format(GUILD_ACHIEVEMENTS_ELIGIBLE_MAXXP, guildName, xpMultiplier * 100), nil, nil, nil, 1);
 	else
+		if ( instanceType == "party" and maxPlayers == 5 ) then
+			numGuildRequired = 4;
+		end
 		GameTooltip:AddLine(string.format(GUILD_ACHIEVEMENTS_ELIGIBLE, numGuildRequired, maxPlayers, guildName), nil, nil, nil, 1);
 	end
 	GameTooltip:Show();

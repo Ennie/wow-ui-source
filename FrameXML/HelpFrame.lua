@@ -101,6 +101,7 @@ local haveResponse = false;		-- true if we got a GM response to a previous ticke
 local needResponse = true;		-- true if we want a GM to contact us when we open a new ticket (Note:  This flag is always true right now)
 local needMoreHelp = false;
 
+local kbsetupLoaded = false;
 
 --
 -- HelpFrame
@@ -130,11 +131,25 @@ function HelpFrame_OnShow(self)
 	UpdateMicroButtons();
 	PlaySound("igCharacterInfoOpen");
 	GetGMStatus();
+	-- hearthstone button events
+	local button = HelpFrameCharacterStuckHearthstone;
+	button:RegisterEvent("BAG_UPDATE_COOLDOWN");
+	button:RegisterEvent("BAG_UPDATE");
+	button:RegisterEvent("SPELL_UPDATE_USABLE");
+	button:RegisterEvent("SPELL_UPDATE_COOLDOWN");
+	button:RegisterEvent("CURRENT_SPELL_CAST_CHANGED");	
 end
 
 function HelpFrame_OnHide(self)
 	PlaySound("igCharacterInfoClose");
 	UpdateMicroButtons();
+	-- hearthstone button events
+	local button = HelpFrameCharacterStuckHearthstone;
+	button:UnregisterEvent("BAG_UPDATE_COOLDOWN");
+	button:UnregisterEvent("BAG_UPDATE");
+	button:UnregisterEvent("SPELL_UPDATE_USABLE");
+	button:UnregisterEvent("SPELL_UPDATE_COOLDOWN");
+	button:UnregisterEvent("CURRENT_SPELL_CAST_CHANGED");
 end
 
 function HelpFrame_OnEvent(self, event, ...)
@@ -170,6 +185,10 @@ function HelpFrame_OnEvent(self, event, ...)
 		else
 			-- the player does not have a ticket
 			haveTicket = false;
+			haveResponse = false;
+			if ( not TicketStatusFrame.hasGMSurvey ) then
+				TicketStatusFrame:Hide();
+			end
 		end
 		HelpFrame_SetTicketEntry();
 	elseif ( event == "GMRESPONSE_RECEIVED" ) then
@@ -318,21 +337,25 @@ function HelpFrameStuckHearthstone_UpdateTooltip(self)
 end
 
 function HelpFrameStuckHearthstone_Update(self)
+	local hearthstoneID = PlayerHasHearthstone();
 	local cooldown = self.Cooldown;
-	local start, duration, enable = GetItemCooldown(HEARTHSTONE_ITEM_ID);
+	local start, duration, enable = GetItemCooldown(hearthstoneID or 0);
 	CooldownFrame_SetTimer(cooldown, start, duration, enable);
-	if ( duration > 0 and enable == 0 ) then
+	if (not hearthstoneID or duration > 0 and enable == 0) then
 		self.IconTexture:SetVertexColor(0.4, 0.4, 0.4);
 	else
 		self.IconTexture:SetVertexColor(1, 1, 1);
 	end
-	
-	if (PlayerHasHearthstone()) then
+
+	if (hearthstoneID) then
 		self:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD");
 		self.IconTexture:SetDesaturated(false);
+		local _, _, _, _, _, _, _, _, _, texture = GetItemInfo(hearthstoneID);
+		self.IconTexture:SetTexture(texture);
 	else
 		self:SetHighlightTexture(nil);
 		self.IconTexture:SetDesaturated(true);
+		self.IconTexture:SetTexture("Interface\\Icons\\inv_misc_rune_01");
 	end
 	
 	if (GameTooltip:GetOwner() == self) then
@@ -432,6 +455,12 @@ function HelpOpenTicketButton_OnUpdate(self, elapsed)
 		GameTooltip:AddLine(" ");
 		GameTooltip:AddLine(HELPFRAME_TICKET_CLICK_HELP, GRAY_FONT_COLOR.r, GRAY_FONT_COLOR.g, GRAY_FONT_COLOR.b, 1);
 		GameTooltip:Show();
+	elseif ( haveResponse ) then
+		GameTooltip:SetOwner(self, "ANCHOR_TOP");
+		GameTooltip:SetText(GM_RESPONSE_ALERT, nil, nil, nil, nil, 1);
+	elseif ( TicketStatusFrame.hasGMSurvey ) then
+		GameTooltip:SetOwner(self, "ANCHOR_TOP");
+		GameTooltip:SetText(CHOSEN_FOR_GMSURVEY, nil, nil, nil, nil, 1);
 	end
 end
 
@@ -441,7 +470,7 @@ function HelpOpenTicketButton_OnEvent(self, event, ...)
 		-- ticketOpenTime,   time_t that this ticket was created
 		-- oldestTicketTime, time_t of the oldest unassigned ticket in the region.
 		-- updateTime,       age in seconds (freshness) of our ticket wait time estimates from the GM dept
-		if ( (category or self.hasGMSurvey) and (not GMChatStatusFrame or not GMChatStatusFrame:IsShown()) ) then
+		if ( (category or TicketStatusFrame.hasGMSurvey) and (not GMChatStatusFrame or not GMChatStatusFrame:IsShown()) ) then
 			self:Show();
 			self.titleText = TICKET_STATUS;
 			local statusText;
@@ -590,7 +619,6 @@ function KnowledgeBase_OnLoad(self)
 	self.scrollFrame.update = KnowledgeBase_UpdateArticles;
 	self.scrollFrame.scrollBar.doNotHide = true;
 	HybridScrollFrame_CreateButtons(self.scrollFrame, "KnowledgeBaseArticleTemplate", 8, -3, "TOPLEFT", "TOPLEFT", 0, -3);
-	self.loaded = 0;
 	
 	--Scroll Frame 2
 	self.scrollFrame2.child:SetWidth(self.scrollFrame2:GetWidth());	
@@ -601,7 +629,7 @@ end
 
 
 function KnowledgeBase_OnShow(self)
-	if ( self.loaded == 0 ) then
+	if ( not kbsetupLoaded ) then
 		KnowledgeBase_GotoTopIssues();
 	end
 end
@@ -609,19 +637,11 @@ end
 
 function KnowledgeBase_OnEvent(self, event, ...)
 	if ( event ==  "KNOWLEDGE_BASE_SETUP_LOAD_SUCCESS") then
-		self.loaded = 1;
-		local totalArticleHeaderCount = KBSetup_GetTotalArticleCount();
-
-		if ( totalArticleHeaderCount > 0 ) then
-			self.totalArticleCount = totalArticleHeaderCount;
-			self.dataFunc = KBSetup_GetArticleHeaderData;
-			KnowledgeBase_UpdateArticles();
-		else
-			KnowledgeBase_ShowErrorFrame(self, KBASE_ERROR_NO_RESULTS);
-		end
+		kbsetupLoaded = true;
+		KnowledgeBase_SnapToTopIssues();
 	elseif ( event ==  "KNOWLEDGE_BASE_SETUP_LOAD_FAILURE" ) then
 		KnowledgeBase_ShowErrorFrame(self, KBASE_ERROR_LOAD_FAILURE);
-		self.loaded = 0;
+		kbsetupLoaded = false;
 	elseif ( event == "KNOWLEDGE_BASE_QUERY_LOAD_SUCCESS" ) then
 		local totalArticleHeaderCount = KBQuery_GetTotalArticleCount();
 
@@ -630,6 +650,7 @@ function KnowledgeBase_OnEvent(self, event, ...)
 			self.totalArticleCount = totalArticleHeaderCount;
 			self.dataFunc = KBQuery_GetArticleHeaderData;
 			KnowledgeBase_UpdateArticles();
+			KnowledgeBase_HideErrorFrame(self, KBASE_ERROR_NO_RESULTS);
 		else
 			KnowledgeBase_ShowErrorFrame(self, KBASE_ERROR_NO_RESULTS);
 		end
@@ -803,6 +824,12 @@ end
 
 
 function KnowledgeBase_DisplayCategories()
+	if( not kbsetupLoaded ) then
+		--never loaded the setup so load setup and go to top issues.
+		KnowledgeBase_GotoTopIssues(); 
+		return;
+	end
+
 	local self = HelpFrame.kbase;
 	local scrollFrame = self.scrollFrame;
 	local offset = HybridScrollFrame_GetOffset(scrollFrame);
@@ -921,13 +948,31 @@ function KnowledgeBase_ShowErrorFrame(self, message)
 	self.errorFrame:Show();
 end
 
+function KnowledgeBase_HideErrorFrame(self, message)
+	if ( self.errorFrame.text:GetText() == message ) then
+		self.errorFrame:Hide();
+	end
+end
 
 ---------------Kbase button functions--------------
 ---------------Kbase button functions--------------
 ---------------Kbase button functions--------------
 function KnowledgeBase_SnapToTopIssues()
 	KnowledgeBase_Clearlist();
-	KBSetup_BeginLoading(KBASE_NUM_ARTICLES_PER_PAGE, 0);
+	if( kbsetupLoaded ) then
+		local totalArticleHeaderCount = KBSetup_GetTotalArticleCount();
+
+		if ( totalArticleHeaderCount > 0 ) then
+			HelpFrame.kbase.totalArticleCount = totalArticleHeaderCount;
+			HelpFrame.kbase.dataFunc = KBSetup_GetArticleHeaderData;
+			KnowledgeBase_UpdateArticles();
+			KnowledgeBase_HideErrorFrame(HelpFrame.kbase, KBASE_ERROR_NO_RESULTS);
+		else
+			KnowledgeBase_ShowErrorFrame(HelpFrame.kbase, KBASE_ERROR_NO_RESULTS);
+		end
+	else
+		KBSetup_BeginLoading(KBASE_NUM_ARTICLES_PER_PAGE, 0);
+	end
 end
 
 function KnowledgeBase_GotoTopIssues()
@@ -938,7 +983,7 @@ function KnowledgeBase_GotoTopIssues()
 		OnClick = KnowledgeBase_SnapToTopIssues,
 	}
 	NavBar_AddButton(HelpFrame.kbase.navBar, buttonData);
-	KBSetup_BeginLoading(KBASE_NUM_ARTICLES_PER_PAGE, 0);
+	KnowledgeBase_SnapToTopIssues();
 end
 
 
@@ -996,6 +1041,4 @@ function KnowledgeBase_ClearSearch(self)
 	self:GetParent().searchButton:Disable();
 	HelpFrame.kbase.hasSearch = false;
 end
-
-
 

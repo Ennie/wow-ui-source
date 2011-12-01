@@ -26,9 +26,9 @@ local chatFilters = {};
 -- if you change what these tables point to (ie slash command, emote, chat)
 -- then you need to invalidate the entry in the hash table
 local hash_SecureCmdList = {}
-hash_SlashCmdList = {}
+hash_SlashCmdList = {}				--[localizedCommand] -> function
 hash_EmoteTokenList = {}
-hash_ChatTypeInfoList = {}
+hash_ChatTypeInfoList = {}			--[localizedCommand] -> identifier (Stores all slash commands)
 
 ChatTypeInfo = { };
 ChatTypeInfo["SYSTEM"]									= { sticky = 0, flashTab = false, flashTabOnGeneral = false };
@@ -648,6 +648,49 @@ ICON_TAG_LIST =
 	[strlower(RAID_TARGET_7)] = 7,
 	[strlower(RAID_TARGET_8)] = 8,
 }
+
+GROUP_TAG_LIST =
+{
+	[strlower(GROUP1_CHAT_TAG1)] 	= 1,
+	[strlower(GROUP1_CHAT_TAG2)] 	= 1,
+	[strlower(GROUP2_CHAT_TAG1)] 	= 2,
+	[strlower(GROUP2_CHAT_TAG2)] 	= 2,
+	[strlower(GROUP3_CHAT_TAG1)] 	= 3,
+	[strlower(GROUP3_CHAT_TAG2)] 	= 3,
+	[strlower(GROUP4_CHAT_TAG1)] 	= 4,
+	[strlower(GROUP4_CHAT_TAG2)] 	= 4,
+	[strlower(GROUP5_CHAT_TAG1)] 	= 5,
+	[strlower(GROUP5_CHAT_TAG2)] 	= 5,
+	[strlower(GROUP6_CHAT_TAG1)] 	= 6,
+	[strlower(GROUP6_CHAT_TAG2)] 	= 6,
+	[strlower(GROUP7_CHAT_TAG1)] 	= 7,
+	[strlower(GROUP7_CHAT_TAG2)] 	= 7,
+	[strlower(GROUP8_CHAT_TAG1)] 	= 8,
+	[strlower(GROUP8_CHAT_TAG2)] 	= 8,
+
+	--Language independent:
+	["g1"]				= 1;
+	["g2"]				= 2;
+	["g3"]				= 3;
+	["g4"]				= 4;
+	["g5"]				= 5;
+	["g6"]				= 6;
+	["g7"]				= 7;
+	["g8"]				= 8;
+};
+
+GROUP_LANGUAGE_INDEPENDENT_STRINGS =
+{
+	"g1",
+	"g2",
+	"g3",
+	"g4",
+	"g5",
+	"g6",
+	"g7",
+	"g8",
+};
+
 
 -- Arena Team Helper Function
 function ArenaTeam_GetTeamSizeID(teamsizearg)
@@ -1474,6 +1517,22 @@ SecureCmdList["EQUIP_SET"] = function(msg)
 	end
 end
 
+SecureCmdList["WORLD_MARKER"] = function(msg)
+	local marker = SecureCmdOptionParse(msg);
+	if ( tonumber(marker) ) then
+		PlaceRaidMarker(tonumber(marker));
+	end
+end
+
+SecureCmdList["CLEAR_WORLD_MARKER"] = function(msg)
+	local marker = SecureCmdOptionParse(msg);
+	if ( tonumber(marker) ) then
+		ClearRaidMarker(tonumber(marker));
+	elseif ( type(marker) == "string" and strtrim(strlower(marker)) == strlower(ALL) ) then
+		ClearRaidMarker(nil);	--Clear all world markers.
+	end
+end
+
 -- Pre-populate the secure command hash table
 for index, value in pairs(SecureCmdList) do
 	local i = 1;
@@ -1540,6 +1599,7 @@ end
 SlashCmdList["REPLY"] = function(msg, editBox)
 	local lastTell = ChatEdit_GetLastTellTarget();
 	if ( lastTell ~= "" ) then
+		msg = SubstituteChatMessageBeforeSend(msg);
 		SendChatMessage(msg, "WHISPER", editBox.language, lastTell);
 	else
 		-- error message
@@ -2012,6 +2072,7 @@ SlashCmdList["WHO"] = function(msg)
 end
 
 SlashCmdList["CHANNEL"] = function(msg, editBox)
+	msg = SubstituteChatMessageBeforeSend(msg);
 	SendChatMessage(msg, "CHANNEL", editBox.language, editBox:GetAttribute("channelTarget"));
 end
 
@@ -2143,10 +2204,10 @@ end
 SlashCmdList["RAID_INFO"] = function(msg)
 	RaidFrame.slashCommand = 1;
 	if ( ( GetNumSavedInstances() > 0 ) and not RaidInfoFrame:IsShown() ) then
-		ToggleFriendsFrame(4);
+		ToggleRaidFrame();
 		RaidInfoFrame:Show();
 	elseif ( not RaidFrame:IsShown() ) then
-		ToggleFriendsFrame(4);
+		ToggleRaidFrame();
 	end
 end
 
@@ -2166,7 +2227,7 @@ SlashCmdList["DUNGEONS"] = function(msg)
 end
 
 SlashCmdList["RAIDBROWSER"] = function(msg)
-	ToggleLFRParentFrame();
+	ToggleFriendsFrame(4);
 end
 
 SlashCmdList["BENCHMARK"] = function(msg)
@@ -2345,6 +2406,77 @@ SlashCmdList["GUILDFINDER"] = function(msg)
 	end
 end
 
+SlashCmdList["TARGET_MARKER"] = function(msg)
+	local marker, target = SecureCmdOptionParse(msg);
+	if ( not target ) then
+		target = "target";
+	end
+	if ( tonumber(marker) ) then
+		SetRaidTarget(target, tonumber(marker));	--Using /tm 0 will clear the target marker.
+	end
+end
+
+function ChatFrame_SetupListProxyTable(list)
+	if ( getmetatable(list) ) then
+		return;
+	end
+	
+	setmetatable(list, { __index = {} });
+end
+
+function ChatFrame_ImportListToHash(list, hash)
+	for k, v in pairs(list) do
+		local i = 1;
+		local tag = _G["SLASH_"..k..i];
+		while(tag) do
+			tag = strupper(tag);
+			if ( hash ) then
+				hash[tag] = v;
+			end
+			hash_ChatTypeInfoList[tag] = k;	--Also need to import it here for all types.
+			i = i + 1;
+			tag = _G["SLASH_"..k..i];
+		end
+		--Add the item we removed to the proxy table.
+		local proxyTable = getmetatable(list).__index;
+		proxyTable[k] = v;
+	end
+	
+	table.wipe(list);
+end
+
+function ChatFrame_ImportEmoteTokensToHash()
+	local i = 1;
+	local j = 1;
+	local cmdString = _G["EMOTE"..i.."_CMD"..j];
+	while ( i <= MAXEMOTEINDEX ) do
+		local token = _G["EMOTE"..i.."_TOKEN"];
+		-- if the code in here changes - change the corresponding code above
+		if ( token ) then
+			hash_EmoteTokenList[strupper(cmdString)] = token;	-- add to hash
+		end
+		j = j + 1;
+		cmdString = _G["EMOTE"..i.."_CMD"..j];
+		if ( not cmdString ) then
+			i = i + 1;
+			j = 1;
+			cmdString = _G["EMOTE"..i.."_CMD"..j];
+		end
+	end
+end
+
+function ChatFrame_ImportAllListsToHash()
+	ChatFrame_ImportListToHash(SecureCmdList, hash_SecureCmdList);
+	ChatFrame_ImportListToHash(SlashCmdList, hash_SlashCmdList);
+	ChatFrame_ImportListToHash(ChatTypeInfo);
+end
+
+ChatFrame_SetupListProxyTable(SecureCmdList);
+ChatFrame_SetupListProxyTable(SlashCmdList);
+ChatFrame_SetupListProxyTable(ChatTypeInfo);
+ChatFrame_ImportAllListsToHash();
+ChatFrame_ImportEmoteTokensToHash();
+
 for index, value in pairs(ChatTypeInfo) do
 	value.r = 1.0;
 	value.g = 1.0;
@@ -2369,6 +2501,7 @@ function ChatFrame_OnLoad(self)
 	self:RegisterEvent("CHAT_SERVER_RECONNECTED");
 	self:RegisterEvent("BN_CONNECTED");
 	self:RegisterEvent("BN_DISCONNECTED");
+	self:RegisterEvent("PLAYER_REPORT_SUBMITTED");
 	self.tellTimer = GetTime();
 	self.channelList = {};
 	self.zoneChannelList = {};
@@ -2718,6 +2851,10 @@ function ChatFrame_SystemEventHandler(self, event, ...)
 		if ( unit == "player" ) then
 			LevelUpDisplay_ChatPrint(self, level, LEVEL_UP_TYPE_GUILD);
 		end
+	elseif ( event == "PLAYER_REPORT_SUBMITTED" ) then
+		local guid = ...;
+		FCF_RemoveAllMessagesFromChanSender(self, guid);
+		return true;
 	end
 end
 
@@ -2921,7 +3058,7 @@ function ChatFrame_MessageEventHandler(self, event, ...)
 			end
 			
 			local accessID = ChatHistory_GetAccessID(Chat_GetChatCategory(type), arg8);
-			local typeID = ChatHistory_GetAccessID(infoType, arg8);
+			local typeID = ChatHistory_GetAccessID(infoType, arg8, arg12);
 			self:AddMessage(format(globalstring, arg8, arg4), info.r, info.g, info.b, info.id, false, accessID, typeID);
 		elseif ( type == "BN_CONVERSATION_NOTICE" ) then
 			local channelLink = format(CHAT_BN_CONVERSATION_GET_LINK, arg8, MAX_WOW_CHAT_CHANNELS + arg8);
@@ -2929,7 +3066,7 @@ function ChatFrame_MessageEventHandler(self, event, ...)
 			local message = format(_G["CHAT_CONVERSATION_"..arg1.."_NOTICE"], channelLink, playerLink)
 			
 			local accessID = ChatHistory_GetAccessID(Chat_GetChatCategory(type), arg8);
-			local typeID = ChatHistory_GetAccessID(infoType, arg8);
+			local typeID = ChatHistory_GetAccessID(infoType, arg8, arg12);
 			self:AddMessage(message, info.r, info.g, info.b, info.id, false, accessID, typeID);
 		elseif ( type == "BN_CONVERSATION_LIST" ) then
 			local channelLink = format(CHAT_BN_CONVERSATION_GET_LINK, arg8, MAX_WOW_CHAT_CHANNELS + arg8);
@@ -2953,6 +3090,8 @@ function ChatFrame_MessageEventHandler(self, event, ...)
 						toonNameText = "|TInterface\\ChatFrame\\UI-ChatIcon-WOW:14|t"..toonNameText;
 					elseif ( client == BNET_CLIENT_SC2 ) then
 						toonNameText = "|TInterface\\ChatFrame\\UI-ChatIcon-SC2:14|t"..toonNameText;
+					elseif ( client == BNET_CLIENT_D3 ) then
+						toonNameText = "|TInterface\\ChatFrame\\UI-ChatIcon-D3:14|t"..toonNameText;
 					end
 					
 					local playerLink = format("|HBNplayer:%s:%s:%s:%s:%s|h[%s] (%s)|h", arg2, arg13, arg11, Chat_GetChatCategory(type), 0, arg2, toonNameText);
@@ -3024,11 +3163,25 @@ function ChatFrame_MessageEventHandler(self, event, ...)
 			end
 			
 			-- Search for icon links and replace them with texture links.
-			local term;
 			for tag in string.gmatch(arg1, "%b{}") do
-				term = strlower(string.gsub(tag, "[{}]", ""));
+				local term = strlower(string.gsub(tag, "[{}]", ""));
 				if ( ICON_TAG_LIST[term] and ICON_LIST[ICON_TAG_LIST[term]] ) then
 					arg1 = string.gsub(arg1, tag, ICON_LIST[ICON_TAG_LIST[term]] .. "0|t");
+				elseif ( GROUP_TAG_LIST[term] ) then
+					local groupIndex = GROUP_TAG_LIST[term];
+					local groupList = "[";
+					for i=1, GetNumRaidMembers() do
+						local name, rank, subgroup, level, class, classFileName = GetRaidRosterInfo(i);
+						if ( subgroup == groupIndex ) then
+							local classColorTable = RAID_CLASS_COLORS[classFileName];
+							if ( classColorTable ) then
+								name = string.format("\124cff%.2x%.2x%.2x%s\124r", classColorTable.r*255, classColorTable.g*255, classColorTable.b*255, name);
+							end
+							groupList = groupList..(groupList == "[" and "" or PLAYER_LIST_DELIMITER)..name;
+						end
+					end
+					groupList = groupList.."]";
+					arg1 = string.gsub(arg1, tag, groupList);
 				end
 			end
 			
@@ -3087,7 +3240,7 @@ function ChatFrame_MessageEventHandler(self, event, ...)
 			end
 			
 			local accessID = ChatHistory_GetAccessID(chatGroup, chatTarget);
-			local typeID = ChatHistory_GetAccessID(infoType, chatTarget);
+			local typeID = ChatHistory_GetAccessID(infoType, chatTarget, arg12 == "" and arg13 or arg12);
 			self:AddMessage(body, info.r, info.g, info.b, info.id, false, accessID, typeID);
 		end
  
@@ -3512,8 +3665,9 @@ function ChatEdit_ResetChatType(self)
 	if ( self:GetAttribute("chatType") == "BATTLEGROUND" and (GetNumRaidMembers() == 0) ) then
 		self:SetAttribute("chatType", "SAY");
 	end
-	self.tabCompleteIndex = 1;
+	self.lastTabComplete = nil;
 	self.tabCompleteText = nil;
+	self.tabCompleteTableIndex = 1;
 	ChatEdit_UpdateHeader(self);
 	ChatEdit_OnInputLanguageChanged(self);
 	--[[if ( CHAT_OPTIONS.ONE_EDIT_AT_A_TIME == "old") then
@@ -3840,6 +3994,7 @@ function ChatEdit_SendText(editBox, addHistory)
 	local type = editBox:GetAttribute("chatType");
 	local text = editBox:GetText();
 	if ( strfind(text, "%s*[^%s]+") ) then
+		text = SubstituteChatMessageBeforeSend(text);
 		--BN_WHISPER FIXME
 		if ( type == "WHISPER") then
 			local target = editBox:GetAttribute("tellTarget");
@@ -3913,6 +4068,7 @@ end
 function ChatEdit_CustomTabPressed(self)
 end
 
+local tabCompleteTables = { hash_ChatTypeInfoList, hash_EmoteTokenList };
 function ChatEdit_SecureTabPressed(self)
 	local chatType = self:GetAttribute("chatType");
 	if ( chatType == "WHISPER" or chatType == "BN_WHISPER" ) then
@@ -3934,87 +4090,32 @@ function ChatEdit_SecureTabPressed(self)
 	if ( strsub(text, 1, 1) ~= "/" ) then
 		return;
 	end
-
-	-- Increment the current tabcomplete count
-	local tabCompleteIndex = self.tabCompleteIndex;
-	self.tabCompleteIndex = tabCompleteIndex + 1;
+	
+	ChatFrame_ImportAllListsToHash();
+	
+	local lastTabComplete = self.lastTabComplete;
 
 	-- If the string is in the format "/cmd blah", command will be "/cmd"
 	local command = strmatch(text, "^(/[^%s]+)") or "";
-
-	for index, value in pairs(ChatTypeInfo) do
-		local i = 1;
-		local cmdString = _G["SLASH_"..index..i];
-		while ( cmdString ) do
-			if ( strfind(cmdString, command, 1, 1) ) then
-				tabCompleteIndex = tabCompleteIndex - 1;
-				if ( tabCompleteIndex == 0 ) then
-					self.ignoreTextChange = 1;
-					self:SetText(cmdString);
-					return;
-				end
-			end
-			i = i + 1;
-			cmdString = _G["SLASH_"..index..i];
+	
+	local cmdString = lastTabComplete;
+	repeat	--The outer loop lets us go through multiple hash tables of commands.
+		repeat	--Loop through this table to find matching items.
+			cmdString = next(tabCompleteTables[self.tabCompleteTableIndex], cmdString);
+		until ( not cmdString or strfind(cmdString, strupper(command), 1, 1) );	--Either we finished going through this table or we found a match.
+		if ( not cmdString ) then	--Nothing else in the current table, move to the next one.
+			self.tabCompleteTableIndex = self.tabCompleteTableIndex + 1;
 		end
-	end
-
-	for index, value in pairs(SecureCmdList) do
-		local i = 1;
-		local cmdString = _G["SLASH_"..index..i];
-		while ( cmdString ) do
-			if ( strfind(cmdString, command, 1, 1) ) then
-				tabCompleteIndex = tabCompleteIndex - 1;
-				if ( tabCompleteIndex == 0 ) then
-					self.ignoreTextChange = 1;
-					self:SetText(cmdString);
-					return;
-				end
-			end
-			i = i + 1;
-			cmdString = _G["SLASH_"..index..i];
-		end
-	end
-	for index, value in pairs(SlashCmdList) do
-		local i = 1;
-		local cmdString = _G["SLASH_"..index..i];
-		while ( cmdString ) do
-			if ( strfind(cmdString, command, 1, 1) ) then
-				tabCompleteIndex = tabCompleteIndex - 1;
-				if ( tabCompleteIndex == 0 ) then
-					self.ignoreTextChange = 1;
-					self:SetText(cmdString);
-					return;
-				end
-			end
-			i = i + 1;
-			cmdString = _G["SLASH_"..index..i];
-		end
-	end
-
-	local i = 1;
-	local j = 1;
-	local cmdString = _G["EMOTE"..i.."_CMD"..j];
-	while ( cmdString ) do
-		if ( strfind(cmdString, command, 1, 1) ) then
-			tabCompleteIndex = tabCompleteIndex - 1;
-			if ( tabCompleteIndex == 0 ) then
-				self.ignoreTextChange = 1;
-				self:SetText(cmdString);
-				return;
-			end
-		end
-		j = j + 1;
-		cmdString = _G["EMOTE"..i.."_CMD"..j];
-		if ( not cmdString ) then
-			i = i + 1;
-			j = 1;
-			cmdString = _G["EMOTE"..i.."_CMD"..j];
-		end
-	end
-
-	-- No tab completion
-	self:SetText(self.tabCompleteText);
+	until ( cmdString or self.tabCompleteTableIndex > #tabCompleteTables );
+	
+	self.lastTabComplete = cmdString;
+	if ( cmdString ) then
+		self.ignoreTextChange = 1;
+		self:SetText(strlower(cmdString));
+	else
+		self.tabCompleteTableIndex = 1;
+		self:SetText(self.tabCompleteText);
+	end	
 end
 
 function ChatEdit_OnTabPressed(self)
@@ -4029,8 +4130,9 @@ end
 function ChatEdit_OnTextChanged(self, userInput)
 	ChatEdit_ParseText(self, 0);
 	if ( not self.ignoreTextChange ) then
-		self.tabCompleteIndex = 1;
+		self.lastTabComplete = nil;
 		self.tabCompleteText = nil;
+		self.tabCompleteTableIndex = 1;
 	end
 	self.ignoreTextChange = nil;
 	local regex = "^((/[^%s]+)%s+)(.+)"
@@ -4124,47 +4226,9 @@ function ChatEdit_HandleChatType(editBox, msg, command, send)
 		end
 	else
 		-- first check the hash table
+		ChatFrame_ImportAllListsToHash();
 		if ( hash_ChatTypeInfoList[command] ) then
 			return processChatType(editBox, msg, hash_ChatTypeInfoList[command], send);
-		end
-		for index, value in pairs(SecureCmdList) do
-			local i = 1;
-			local cmdString = _G["SLASH_"..index..i];
-			while ( cmdString ) do
-				cmdString = strupper(cmdString);
-				if ( cmdString == command ) then
-					hash_ChatTypeInfoList[command] = index;
-					return processChatType(editBox, msg, index, send);
-				end
-				i = i + 1;
-				cmdString = _G["SLASH_"..index..i];
-			end
-		end
-		for index, value in pairs(SlashCmdList) do
-			local i = 1;
-			local cmdString = _G["SLASH_"..index..i];
-			while ( cmdString ) do
-				cmdString = strupper(cmdString);
-				if ( cmdString == command ) then
-					hash_ChatTypeInfoList[command] = index;
-					return processChatType(editBox, msg, index, send);
-				end
-				i = i + 1;
-				cmdString = _G["SLASH_"..index..i];
-			end
-		end
-		for index, value in pairs(ChatTypeInfo) do
-			local i = 1;
-			local cmdString = _G["SLASH_"..index..i];
-			while ( cmdString ) do
-				cmdString = strupper(cmdString);
-				if ( cmdString == command ) then
-					hash_ChatTypeInfoList[command] = index;	-- add to hash table
-					return processChatType(editBox, msg, index, send);
-				end
-				i = i + 1;
-				cmdString = _G["SLASH_"..index..i];
-			end
 		end
 	end
 	--This isn't one we found in our list, so we're not going to autocomplete.
@@ -4212,6 +4276,8 @@ function ChatEdit_ParseText(editBox, send, parseIfNoSpaces)
 		return;
 	end
 
+	ChatFrame_ImportAllListsToHash();
+	
 	-- Handle chat types. No need for a securecall here, since we should be done with anything secure.
 	if ( ChatEdit_HandleChatType(editBox, msg, command, send) ) then
 		return;
@@ -4236,49 +4302,6 @@ function ChatEdit_ParseText(editBox, send, parseIfNoSpaces)
 		return;
 	end
 
-	-- If we didn't have the command in the hash tables, look for it the slow way...
-	for index, value in pairs(SlashCmdList) do
-		local i = 1;
-		local cmdString = _G["SLASH_"..index..i];
-		while ( cmdString ) do
-			cmdString = strupper(cmdString);
-			if ( cmdString == command ) then
-				-- if the code in here changes - change the corresponding code above
-				hash_SlashCmdList[command] = value;	-- add to hash
-				value(strtrim(msg), editBox);
-				editBox:AddHistoryLine(text);
-				ChatEdit_OnEscapePressed(editBox);
-				return;
-			end
-			i = i + 1;
-			cmdString = _G["SLASH_"..index..i];
-		end
-	end
-
-	local i = 1;
-	local j = 1;
-	local cmdString = _G["EMOTE"..i.."_CMD"..j];
-	while ( i <= MAXEMOTEINDEX ) do
-		if ( cmdString and strupper(cmdString) == command ) then
-			local token = _G["EMOTE"..i.."_TOKEN"];
-			-- if the code in here changes - change the corresponding code above
-			if ( token ) then
-				hash_EmoteTokenList[command] = token;	-- add to hash
-				DoEmote(token, msg);
-			end
-			editBox:AddHistoryLine(text);
-			ChatEdit_OnEscapePressed(editBox);
-			return;
-		end
-		j = j + 1;
-		cmdString = _G["EMOTE"..i.."_CMD"..j];
-		if ( not cmdString ) then
-			i = i + 1;
-			j = 1;
-			cmdString = _G["EMOTE"..i.."_CMD"..j];
-		end
-	end
-
 	-- Unrecognized chat command, show simple help text
 	if ( editBox.chatFrame ) then
 		local info = ChatTypeInfo["SYSTEM"];
@@ -4288,6 +4311,17 @@ function ChatEdit_ParseText(editBox, send, parseIfNoSpaces)
 	-- Reset the chat type and clear the edit box's contents
 	ChatEdit_OnEscapePressed(editBox);
 	return;
+end
+
+function SubstituteChatMessageBeforeSend(msg)
+	for tag in string.gmatch(msg, "%b{}") do
+		local term = strlower(string.gsub(tag, "[{}]", ""));
+		if ( GROUP_TAG_LIST[term] ) then
+			local groupIndex = GROUP_TAG_LIST[term];
+			msg = string.gsub(msg, tag, "{"..GROUP_LANGUAGE_INDEPENDENT_STRINGS[groupIndex].."}");
+		end
+	end
+	return msg;
 end
 
 local tellTargetExtractionAutoComplete = AUTOCOMPLETE_LIST.ALL;

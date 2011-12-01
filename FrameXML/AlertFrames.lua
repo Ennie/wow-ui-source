@@ -85,6 +85,11 @@ function GuildChallengeAlertFrame_FixAnchors()
 		end
 	end
 	
+	local frame = MissingLootFrame;
+	if ( frame:IsShown() ) then
+		GuildChallengeAlertFrame:SetPoint("BOTTOM", frame, "TOP", 0, 10);
+	end
+
 	GuildChallengeAlertFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 128);
 end
 
@@ -118,6 +123,11 @@ function DungeonCompletionAlertFrame_FixAnchors()
 		end
 	end
 	
+	local frame = MissingLootFrame;
+	if ( frame:IsShown() ) then
+		DungeonCompletionAlertFrame1:SetPoint("BOTTOM", frame, "TOP", 0, 10);	
+	end
+	
 	DungeonCompletionAlertFrame1:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 128);
 end
 
@@ -126,8 +136,23 @@ function DungeonCompletionAlertFrame_ShowAlert()
 	PlaySound("LFG_Rewards");
 	local frame = DungeonCompletionAlertFrame1;
 	--For now we only have 1 dungeon alert frame. If you're completing more than one dungeon within ~5 seconds, tough luck.
-	local name, typeID, textureFilename, moneyBase, moneyVar, experienceBase, experienceVar, numStrangers, numRewards= GetLFGCompletionReward();
+	local name, typeID, subtypeID, textureFilename, moneyBase, moneyVar, experienceBase, experienceVar, numStrangers, numRewards= GetLFGCompletionReward();
 	
+	if ( subtypeID == LFG_SUBTYPEID_RAID ) then
+		frame.raidArt:Show();
+		frame.dungeonArt1:Hide();
+		frame.dungeonArt2:Hide();
+		frame.dungeonArt3:Hide();
+		frame.dungeonArt4:Hide();
+		frame.dungeonTexture:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 26, 18);
+	else
+		frame.raidArt:Hide();
+		frame.dungeonArt1:Show();
+		frame.dungeonArt2:Show();
+		frame.dungeonArt3:Show();
+		frame.dungeonArt4:Show();
+		frame.dungeonTexture:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 13, 13);
+	end
 	
 	--Set up the rewards
 	local moneyAmount = moneyBase + moneyVar * numStrangers;
@@ -172,7 +197,7 @@ function DungeonCompletionAlertFrame_ShowAlert()
 	--Set up the text and icons.
 	
 	frame.instanceName:SetText(name);
-	if ( typeID == TYPEID_HEROIC_DIFFICULTY ) then
+	if ( subtypeID == LFG_SUBTYPEID_HEROIC ) then
 		frame.heroicIcon:Show();
 		frame.instanceName:SetPoint("TOP", 33, -44);
 	else
@@ -201,7 +226,7 @@ function DungeonCompletionAlertFrameReward_OnEnter(self)
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
 	if ( self.rewardID == 0 ) then
 		GameTooltip:AddLine(YOU_RECEIVED);
-		local name, typeID, textureFilename, moneyBase, moneyVar, experienceBase, experienceVar, numStrangers, numRewards = GetLFGCompletionReward();
+		local name, typeID, subtypeID, textureFilename, moneyBase, moneyVar, experienceBase, experienceVar, numStrangers, numRewards = GetLFGCompletionReward();
 
 		local moneyAmount = moneyBase + moneyVar * numStrangers;
 		local experienceGained = experienceBase + experienceVar * numStrangers;
@@ -241,6 +266,11 @@ function AchievementAlertFrame_FixAnchors ()
 			AchievementAlertFrame1:SetPoint("BOTTOM", frame, "TOP", 0, 10);
 			return;
 		end
+	end
+	
+	local frame = MissingLootFrame;
+	if ( frame:IsShown() ) then
+		AchievementAlertFrame1:SetPoint("BOTTOM", frame, "TOP", 0, 10);	
 	end
 	
 	AchievementAlertFrame1:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 128);

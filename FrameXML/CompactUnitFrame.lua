@@ -75,6 +75,9 @@ function CompactUnitFrame_OnEvent(self, event, ...)
 			CompactUnitFrame_UpdateHealth(self);
 			CompactUnitFrame_UpdateStatusText(self);
 			CompactUnitFrame_UpdateHealPrediction(self);
+			if ( event == "UNIT_HEALTH" ) then	--To make sure we fix 283903 (some sort of race condition). Try removing later.
+				CompactUnitFrame_UpdateHealthColor(self);
+			end
 		elseif ( event == "UNIT_MAXPOWER" ) then
 			CompactUnitFrame_UpdateMaxPower(self);
 			CompactUnitFrame_UpdatePower(self);
@@ -86,6 +89,7 @@ function CompactUnitFrame_OnEvent(self, event, ...)
 			CompactUnitFrame_UpdatePowerColor(self);
 		elseif ( event == "UNIT_NAME_UPDATE" ) then
 			CompactUnitFrame_UpdateName(self);
+			CompactUnitFrame_UpdateHealthColor(self);	--This may signify that we now have the unit's class (the name cache entry hsa been received).
 		elseif ( event == "UNIT_AURA" ) then
 			CompactUnitFrame_UpdateAuras(self);
 		elseif ( event == "UNIT_THREAT_SITUATION_UPDATE" ) then
@@ -282,7 +286,10 @@ function CompactUnitFrame_UpdateHealthColor(frame)
 			end
 		end
 	end
-	frame.healthBar:SetStatusBarColor(r, g, b);
+	if ( r ~= frame.healthBar.r or g ~= frame.healthBar.g or b ~= frame.healthBar.b ) then
+		frame.healthBar:SetStatusBarColor(r, g, b);
+		frame.healthBar.r, frame.healthBar.g, frame.healthBar.b = r, g, b;
+	end
 end
 
 function CompactUnitFrame_UpdateMaxHealth(frame)
@@ -518,11 +525,15 @@ function CompactUnitFrame_UpdateReadyCheck(frame)
 end
 
 function CompactUnitFrame_FinishReadyCheck(frame)
-	frame.readyCheckDecay = CUF_READY_CHECK_DECAY_TIME;
-	
-	if ( frame.readyCheckStatus == "waiting" ) then	--If you haven't responded, you are not ready.
-		frame.readyCheckIcon:SetTexture(READY_CHECK_NOT_READY_TEXTURE);
-		frame.readyCheckIcon:Show();
+	if ( frame:IsVisible() ) then
+		frame.readyCheckDecay = CUF_READY_CHECK_DECAY_TIME;
+		
+		if ( frame.readyCheckStatus == "waiting" ) then	--If you haven't responded, you are not ready.
+			frame.readyCheckIcon:SetTexture(READY_CHECK_NOT_READY_TEXTURE);
+			frame.readyCheckIcon:Show();
+		end
+	else
+		CompactUnitFrame_UpdateReadyCheck(frame);
 	end
 end
 
@@ -670,7 +681,7 @@ function CompactUnitFrame_UpdateDispellableDebuffs(frame)
 	local frameNum = 1;
 	local filter = "RAID";	--Only dispellable debuffs.
 	while ( frameNum <= frame.maxDispelDebuffs ) do
-		local name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, isStealable, shouldConsolidate, spellId = UnitDebuff(frame.displayedUnit, index, filter);
+		local name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, canStealOrPurge, shouldConsolidate, spellId = UnitDebuff(frame.displayedUnit, index, filter);
 		if ( dispellableDebuffTypes[debuffType] and not frame["hasDispel"..debuffType] ) then
 			frame["hasDispel"..debuffType] = true;
 			local dispellDebuffFrame = frame.dispelDebuffFrames[frameNum];
@@ -689,11 +700,14 @@ end
 
 --Utility Functions
 function CompactUnitFrame_UtilShouldDisplayBuff(unit, index, filter)
-	local name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, isStealable, shouldConsolidate, spellId, canApplyAura = UnitBuff(unit, index, filter);
-	if ( UnitAffectingCombat("player") ) then
-		return (unitCaster == "player" or unitCaster == "pet") and not shouldConsolidate and duration > 0 and canApplyAura;
+	local name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, canStealOrPurge, shouldConsolidate, spellId, canApplyAura = UnitBuff(unit, index, filter);
+	
+	local hasCustom, alwaysShowMine, showForMySpec = SpellGetVisibilityInfo(spellId, UnitAffectingCombat("player") and "RAID_INCOMBAT" or "RAID_OUTOFCOMBAT");
+	
+	if ( hasCustom ) then
+		return showForMySpec or (alwaysShowMine and (unitCaster == "player" or unitCaster == "pet" or unitCaster == "vehicle"));
 	else
-		return canApplyAura;
+		return (unitCaster == "player" or unitCaster == "pet" or unitCaster == "vehicle") and not shouldConsolidate and canApplyAura and not SpellIsSelfBuff(spellId);
 	end
 end
 
@@ -704,7 +718,7 @@ function CompactUnitFrame_HideAllBuffs(frame)
 end
 
 function CompactUnitFrame_UtilSetBuff(buffFrame, unit, index, filter)
-	local name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, isStealable, shouldConsolidate, spellId, canApplyAura = UnitBuff(unit, index, filter);
+	local name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, canStealOrPurge, shouldConsolidate, spellId, canApplyAura = UnitBuff(unit, index, filter);
 	buffFrame.icon:SetTexture(icon);
 	if ( count > 1 ) then
 		local countText = count;
@@ -728,17 +742,23 @@ function CompactUnitFrame_UtilSetBuff(buffFrame, unit, index, filter)
 end
 
 function CompactUnitFrame_UtilShouldDisplayDebuff(unit, index, filter)
-	--local name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, isStealable, shouldConsolidate, spellId = UnitDebuff(unit, index, filter);
-	return true;
+	local name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, canStealOrPurge, shouldConsolidate, spellId, canApplyAura, isBossDebuff = UnitDebuff(unit, index, filter);
+	
+	local hasCustom, alwaysShowMine, showForMySpec = SpellGetVisibilityInfo(spellId, UnitAffectingCombat("player") and "RAID_INCOMBAT" or "RAID_OUTOFCOMBAT");
+	if ( hasCustom ) then
+		return showForMySpec or (alwaysShowMine and (unitCaster == "player" or unitCaster == "pet" or unitCaster == "vehicle") );	--Would only be "mine" in the case of something like forbearance.
+	else
+		return true;
+	end
 end
 
 function CompactUnitFrame_UtilIsBossDebuff(unit, index, filter)
-	local name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, isStealable, shouldConsolidate, spellId, canApplyAura, isBossDebuff = UnitDebuff(unit, index, filter);
+	local name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, canStealOrPurge, shouldConsolidate, spellId, canApplyAura, isBossDebuff = UnitDebuff(unit, index, filter);
 	return isBossDebuff;
 end
 
 function CompactUnitFrame_UtilIsPriorityDebuff(unit, index, filter)
-	local name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, isStealable, shouldConsolidate, spellId, canApplyAura, isBossDebuff = UnitDebuff(unit, index, filter);
+	local name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, canStealOrPurge, shouldConsolidate, spellId, canApplyAura, isBossDebuff = UnitDebuff(unit, index, filter);
 	
 	local _, classFilename = UnitClass("player");
 	if ( classFilename == "PALADIN" ) then
@@ -769,7 +789,7 @@ function CompactUnitFrame_UtilSetDebuffBossDebuff(debuffFrame, isBossDebuff)
 end
 
 function CompactUnitFrame_UtilSetDebuff(debuffFrame, unit, index, filter)
-	local name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, isStealable, shouldConsolidate, spellId = UnitDebuff(unit, index, filter);
+	local name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, canStealOrPurge, shouldConsolidate, spellId = UnitDebuff(unit, index, filter);
 	debuffFrame.filter = filter;
 	debuffFrame.icon:SetTexture(icon);
 	if ( count > 1 ) then

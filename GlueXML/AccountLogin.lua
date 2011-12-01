@@ -62,12 +62,6 @@ function AccountLogin_OnShow(self)
 	else
 		AccountLogin_FocusPassword();
 	end
-	
-	if( IsTrialAccount() ) then
-		AccountLoginUpgradeAccountButton:Show();
-	else
-		AccountLoginUpgradeAccountButton:Hide();
-	end
 
 	ACCOUNT_MSG_NUM_AVAILABLE = 0;
 	ACCOUNT_MSG_PRIORITY = 0;
@@ -164,23 +158,15 @@ end
 
 function AccountLogin_Login()
 	PlaySound("gsLogin");
+	DefaultServerLogin(AccountLoginAccountEdit:GetText(), AccountLoginPasswordEdit:GetText());
+	AccountLoginPasswordEdit:SetText("");
 
-	-- Must occur before DefaultServerLogin so client knows setting of checkbox
 	if ( AccountLoginSaveAccountName:GetChecked() ) then
 		SetSavedAccountName(AccountLoginAccountEdit:GetText());
-		SetAllowTokenCaching(true);
 	else
 		SetSavedAccountName("");
 		SetUsesToken(false);
-		if ( SAVE_ACCOUNT_BUTTON_HIDDEN ) then
-			SetAllowTokenCaching(true);
-		else
-			SetAllowTokenCaching(false);
-		end
 	end
-
-	DefaultServerLogin(AccountLoginAccountEdit:GetText(), AccountLoginPasswordEdit:GetText());
-	AccountLoginPasswordEdit:SetText("");
 end
 
 function AccountLogin_TOS()
@@ -204,11 +190,6 @@ end
 function AccountLogin_LaunchCommunitySite()
 	PlaySound("gsLoginNewAccount");
 	LaunchURL(COMMUNITY_URL);
-end
-
-function CharacterSelect_UpgradeAccount()
-	PlaySound("gsLoginNewAccount");
-	LaunchURL(AUTH_NO_TIME_URL);
 end
 
 function AccountLogin_Credits()

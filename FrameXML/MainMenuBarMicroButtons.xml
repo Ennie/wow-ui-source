@@ -361,9 +361,34 @@
 			</OnClick>
 		</Scripts>
 	</Button>
-	<Button name="EJMicroButton" inherits="MainMenuBarMicroButton" parent="MainMenuBarArtFrame">
+	<Button name="RaidMicroButton" inherits="MainMenuBarMicroButton" parent="MainMenuBarArtFrame">
 		<Anchors>
 			<Anchor point="BOTTOMLEFT" relativeTo="LFDMicroButton" relativePoint="BOTTOMRIGHT">
+				<Offset>
+					<AbsDimension x="-3" y="0"/>
+				</Offset>
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnLoad>
+				LoadMicroButtonTextures(self, "Raid");
+				SetDesaturation(self:GetDisabledTexture(), true);
+				self.tooltipText = MicroButtonTooltipText(RAID_FINDER, "TOGGLERAIDFINDER");
+				self.newbieText = NEWBIE_TOOLTIP_RAID_FINDER;
+				self.minLevel = SHOW_LFD_LEVEL;
+			</OnLoad>
+			<OnEvent>
+				self.tooltipText = MicroButtonTooltipText(RAID_FINDER, "TOGGLERAIDFINDER");
+				self.newbieText = NEWBIE_TOOLTIP_RAID_FINDER;
+			</OnEvent>
+			<OnClick>
+				ToggleRaidFrame();
+			</OnClick>
+		</Scripts>
+	</Button>
+	<Button name="EJMicroButton" inherits="MainMenuBarMicroButton" parent="MainMenuBarArtFrame">
+		<Anchors>
+			<Anchor point="BOTTOMLEFT" relativeTo="RaidMicroButton" relativePoint="BOTTOMRIGHT">
 				<Offset>
 					<AbsDimension x="-3" y="0"/>
 				</Offset>
@@ -382,38 +407,13 @@
 				self.newbieText = NEWBIE_TOOLTIP_ENCOUNTER_JOURNAL;
 			</OnEvent>
 			<OnClick>
-				ToggleFrame(EncounterJournal);
-			</OnClick>
-		</Scripts>
-	</Button>
-	<Button name="RaidMicroButton" inherits="MainMenuBarMicroButton" parent="MainMenuBarArtFrame">
-		<Anchors>
-			<Anchor point="BOTTOMLEFT" relativeTo="EJMicroButton" relativePoint="BOTTOMRIGHT">
-				<Offset>
-					<AbsDimension x="-3" y="0"/>
-				</Offset>
-			</Anchor>
-		</Anchors>
-		<Scripts>
-			<OnLoad>
-				LoadMicroButtonTextures(self, "Raid");
-				SetDesaturation(self:GetDisabledTexture(), true);
-				self.tooltipText = MicroButtonTooltipText(RAID, "TOGGLERAIDTAB");
-				self.newbieText = NEWBIE_TOOLTIP_RAID;
-				self.minLevel = SHOW_LFD_LEVEL;
-			</OnLoad>
-			<OnEvent>
-				self.tooltipText = MicroButtonTooltipText(RAID, "TOGGLERAIDTAB");
-				self.newbieText = NEWBIE_TOOLTIP_RAIDTAB;
-			</OnEvent>
-			<OnClick>
-				ToggleFriendsFrame(4);
+				ToggleEncounterJournal();
 			</OnClick>
 		</Scripts>
 	</Button>
 	<Button name="MainMenuMicroButton" inherits="MainMenuBarMicroButton" parent="MainMenuBarArtFrame">
 		<Anchors>
-			<Anchor point="BOTTOMLEFT" relativeTo="RaidMicroButton" relativePoint="BOTTOMRIGHT">
+			<Anchor point="BOTTOMLEFT" relativeTo="EJMicroButton" relativePoint="BOTTOMRIGHT">
 				<Offset>
 					<AbsDimension x="-3" y="0"/>
 				</Offset>

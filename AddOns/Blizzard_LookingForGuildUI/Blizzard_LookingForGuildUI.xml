@@ -26,7 +26,7 @@
 		<PushedTexture file="Interface\Buttons\UI-CheckBox-Down"/>
 		<HighlightTexture file="Interface\Buttons\UI-CheckBox-Highlight" alphaMode="ADD"/>
 		<CheckedTexture file="Interface\Buttons\UI-CheckBox-Check"/>
-		<DisabledCheckedTexture file="Interface\Buttons\UI-CheckBox-Check-Disabled"/>					
+		<DisabledCheckedTexture file="Interface\Buttons\UI-CheckBox-Check-Disabled"/>
 	</CheckButton>
 	<Frame name="LookingForGuildSectionTemplate" virtual="true">
 		<Size x="312" y="74"/>
@@ -87,7 +87,7 @@
 				<PushedTexture file="Interface\Buttons\UI-CheckBox-Down"/>
 				<HighlightTexture file="Interface\Buttons\UI-CheckBox-Highlight" alphaMode="ADD"/>
 				<CheckedTexture file="Interface\Buttons\UI-CheckBox-Check"/>
-				<DisabledCheckedTexture file="Interface\Buttons\UI-CheckBox-Check-Disabled"/>	
+				<DisabledCheckedTexture file="Interface\Buttons\UI-CheckBox-Check-Disabled"/>
 			</CheckButton>
 		</Frames>
 		<Scripts>
@@ -98,7 +98,7 @@
 					GameTooltip:AddLine(YOUR_CLASS_MAY_NOT_PERFORM_ROLE, 1, 0, 0, 1);
 				end
 				GameTooltip:Show();
-				LFDFrameRoleCheckButton_OnEnter(self);
+				LFGFrameRoleCheckButton_OnEnter(self);
 			</OnEnter>
 			<OnClick>
 				if ( self.checkButton:IsEnabled() == 1 ) then
@@ -115,7 +115,7 @@
 	<Button name="LookingForGuildGuildTemplate" virtual="true" hidden="true">
 		<Size>
 			<AbsDimension x="320" y="84"/>
-		</Size>	
+		</Size>
 		<Backdrop bgFile="Interface\Tooltips\UI-Tooltip-Background" edgeFile="Interface\Tooltips\UI-Tooltip-Border" tile="true">
 			<EdgeSize>
 				<AbsValue val="12"/>
@@ -277,7 +277,7 @@
 	<Button name="LookingForGuildAppTemplate" virtual="true">
 		<Size>
 			<AbsDimension x="320" y="30"/>
-		</Size>	
+		</Size>
 		<Backdrop bgFile="Interface\Tooltips\UI-Tooltip-Background" edgeFile="Interface\Tooltips\UI-Tooltip-Border" tile="true">
 			<EdgeSize>
 				<AbsValue val="12"/>
@@ -512,7 +512,7 @@
 						<Size x="0" y="30"/>
 						<Anchors>
 							<Anchor point="LEFT" relativeTo="LookingForGuildQuestText" relativePoint="RIGHT" x="0" y="0"/>
-							<Anchor point="RIGHT" relativeTo="LookingForGuildRaidButton" relativePoint="LEFT" x="0" y="0"/>									
+							<Anchor point="RIGHT" relativeTo="LookingForGuildRaidButton" relativePoint="LEFT" x="0" y="0"/>
 						</Anchors>
 						<Layers>
 							<Layer level="ARTWORK">
@@ -643,7 +643,6 @@
 						<Scripts>
 							<OnLoad>
 								self:GetNormalTexture():SetTexCoord(GetTexCoordsForRole("TANK"));
-								self.checkButton.onClick = LFDFrameRoleCheckButton_OnClick;
 								self.param = LFGUILD_PARAM_TANK;
 								LookingForGuildTankButtonText:SetText(TANK);
 							</OnLoad>
@@ -660,7 +659,6 @@
 						<Scripts>
 							<OnLoad>
 								self:GetNormalTexture():SetTexCoord(GetTexCoordsForRole("HEALER"));
-								self.checkButton.onClick = LFDFrameRoleCheckButton_OnClick;
 								self.param = LFGUILD_PARAM_HEALER;
 								LookingForGuildHealerButtonText:SetText(HEALER);
 							</OnLoad>
@@ -677,7 +675,6 @@
 						<Scripts>
 							<OnLoad>
 								self:GetNormalTexture():SetTexCoord(GetTexCoordsForRole("DAMAGER"));
-								self.checkButton.onClick = LFDFrameRoleCheckButton_OnClick;
 								self.param = LFGUILD_PARAM_DAMAGE;
 								LookingForGuildDamagerButtonText:SetText(DAMAGER);
 							</OnLoad>
@@ -803,7 +800,7 @@
 									</OnLoad>
 								</Scripts>
 								<ScrollChild>
-									<EditBox name="LookingForGuildCommentEditBox" multiLine="true" letters="255" countInvisibleLetters="true" autoFocus="false">
+									<EditBox name="LookingForGuildCommentEditBox" multiLine="true" letters="230" countInvisibleLetters="true" autoFocus="false">
 										<Size x="258" y="1"/>
 										<Layers>
 											<Layer level="BORDER">
@@ -831,7 +828,7 @@
 												else
 													LookingForGuildCommentEditBoxFill:Show();
 												end
-											</OnTextChanged> 
+											</OnTextChanged>
 											<OnCursorChanged function="ScrollingEdit_OnCursorChanged"/>
 											<OnUpdate>
 												ScrollingEdit_OnUpdate(self, elapsed, self:GetParent());
@@ -864,7 +861,7 @@
 					</OnEnter>
 					<OnLeave function="GameTooltip_Hide"/>
 				</Scripts>
-			</Button>			
+			</Button>
 		</Frames>
 		<Scripts>
 			<OnLoad function="LookingForGuildStartFrame_OnLoad"/>
@@ -886,7 +883,7 @@
 					<Anchors>
 						<Anchor point="BOTTOMRIGHT" relativeTo="LookingForGuildFrame" relativePoint="BOTTOMRIGHT" x="-15" y="9" />
 					</Anchors>
-				</FontString>			
+				</FontString>
 			</Layer>
 		</Layers>
 		<Frames>
@@ -927,7 +924,7 @@
 					</OnEnter>
 					<OnLeave function="GameTooltip_Hide"/>
 				</Scripts>
-			</Button>			
+			</Button>
 		</Frames>
 		<Scripts>
 			<OnLoad function="LookingForGuildBrowseFrame_OnLoad"/>
@@ -1133,7 +1130,7 @@
 							</OnLoad>
 						</Scripts>
 						<ScrollChild>
-							<EditBox name="GuildFinderRequestMembershipEditBox" multiLine="true" letters="255" countInvisibleLetters="true" autoFocus="false">
+							<EditBox name="GuildFinderRequestMembershipEditBox" multiLine="true" letters="230" countInvisibleLetters="true" autoFocus="false">
 								<Size x="258" y="1"/>
 								<Layers>
 									<Layer level="BORDER">
@@ -1166,7 +1163,7 @@
 										else
 											GuildFinderRequestMembershipEditBoxFill:Show();
 										end
-									</OnTextChanged> 
+									</OnTextChanged>
 									<OnCursorChanged function="ScrollingEdit_OnCursorChanged"/>
 									<OnUpdate>
 										ScrollingEdit_OnUpdate(self, elapsed, self:GetParent());
@@ -1183,7 +1180,7 @@
 						</ScrollChild>
 					</ScrollFrame>
 				</Frames>
-			</Frame>		
+			</Frame>
 			<Button name="$parentAcceptButton" inherits="UIPanelButtonTemplate2" text="SEND_LABEL">
 				<Size>
 					<AbsDimension x="118" y="22"/>

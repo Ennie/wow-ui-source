@@ -1,6 +1,7 @@
 StaticPopup_DisplayedFrames = { };
 
 STATICPOPUP_NUMDIALOGS = 4;
+STATICPOPUP_TIMEOUT = 60;
 STATICPOPUP_TEXTURE_ALERT = "Interface\\DialogFrame\\UI-Dialog-Icon-AlertNew";
 STATICPOPUP_TEXTURE_ALERTGEAR = "Interface\\DialogFrame\\UI-Dialog-Icon-AlertOther";
 StaticPopupDialogs = { };
@@ -43,6 +44,20 @@ StaticPopupDialogs["ERROR_CINEMATIC"] = {
 	end,
 	whileDead = 1,
 	hideOnEscape = 1,
+}
+
+StaticPopupDialogs["ERR_SOR_STARTING_EXPERIENCE_INCOMPLETE"] = {
+	text = ERR_SOR_STARTING_EXPERIENCE_INCOMPLETE,
+	button1 = OKAY,
+	button2 = nil,
+	timeout = 0,
+	OnAccept = function()
+	end,
+	OnCancel = function()
+	end,
+	whileDead = 1,
+	hideOnEscape = 1,
+	showAlert = 1,
 }
 
 StaticPopupDialogs["CONFIRM_DELETE_EQUIPMENT_SET"] = {
@@ -159,6 +174,25 @@ StaticPopupDialogs["CONFIRM_RESET_INTERFACE_SETTINGS"] = {
 	hideOnEscape = 1,
 	whileDead = 1,
 }
+
+StaticPopupDialogs["MAC_OPEN_UNIVERSAL_ACCESS"] = { 
+	text = MAC_OPEN_UNIVERSAL_ACCESS,
+	button1 = YES,
+	button2 = NO,
+	OnAccept = function ()
+		MacOptions_OpenUniversalAccess();
+		ShowUIPanel(MacOptionsFrame);
+	end,
+	OnCancel = function()
+		ShowUIPanel(MacOptionsFrame);
+	end,
+	showAlert = 1,
+	timeout = 0,
+	exclusive = 1,
+	hideOnEscape = 1,
+	whileDead = 1,
+}
+
 
 StaticPopupDialogs["CONFIRM_PURCHASE_TOKEN_ITEM"] = {
 	text = CONFIRM_PURCHASE_TOKEN_ITEM,
@@ -618,7 +652,12 @@ StaticPopupDialogs["BFMGR_INVITED_TO_ENTER"] = {
 	button1 = ACCEPT,
 	button2 = CANCEL,
 	OnShow = function(self)
-		self.timeleft = select(4, GetWorldPVPQueueStatus(1));
+		for i = 1, MAX_WORLD_PVP_QUEUES do
+			local status, mapName, queueID, timeleft = GetWorldPVPQueueStatus(i);
+			if ( queueID == self.data ) then
+				self.timeleft = timeleft;
+			end
+		end
 	end,	
 	OnAccept = function(self, battleID)
 		BattlefieldMgrEntryInviteResponse(battleID,1);
@@ -1227,6 +1266,7 @@ StaticPopupDialogs["DEATH"] = {
 	whileDead = 1,
 	interruptCinematic = 1,
 	notClosableByLogout = 1,
+	noCancelOnReuse = 1,
 	cancels = "RECOVER_CORPSE"
 };
 StaticPopupDialogs["RESURRECT"] = {
@@ -1247,7 +1287,7 @@ StaticPopupDialogs["RESURRECT"] = {
 			StaticPopup_Show("DEATH");
 		end
 	end,
-	timeout = 60,
+	timeout = STATICPOPUP_TIMEOUT,
 	whileDead = 1,
 	cancels = "DEATH",
 	interruptCinematic = 1,
@@ -1273,7 +1313,7 @@ StaticPopupDialogs["RESURRECT_NO_SICKNESS"] = {
 			StaticPopup_Show("DEATH");
 		end
 	end,
-	timeout = 60,
+	timeout = STATICPOPUP_TIMEOUT,
 	whileDead = 1,
 	cancels = "DEATH",
 	interruptCinematic = 1,
@@ -1297,7 +1337,7 @@ StaticPopupDialogs["RESURRECT_NO_TIMER"] = {
 			StaticPopup_Show("DEATH");
 		end
 	end,
-	timeout = 60,
+	timeout = STATICPOPUP_TIMEOUT,
 	whileDead = 1,
 	cancels = "DEATH",
 	interruptCinematic = 1,
@@ -1339,7 +1379,7 @@ StaticPopupDialogs["TRADE"] = {
 	OnCancel = function(self)
 		CancelTrade();
 	end,
-	timeout = 60,
+	timeout = STATICPOPUP_TIMEOUT,
 	hideOnEscape = 1
 };
 StaticPopupDialogs["PARTY_INVITE"] = {
@@ -1363,7 +1403,7 @@ StaticPopupDialogs["PARTY_INVITE"] = {
 			self:Hide();
 		end
 	end,
-	timeout = 60,
+	timeout = STATICPOPUP_TIMEOUT,
 	whileDead = 1,
 	hideOnEscape = 1
 };
@@ -1418,7 +1458,7 @@ StaticPopupDialogs["CHAT_CHANNEL_INVITE"] = {
 		local name = data;
 		DeclineInvite(name);
 	end,
-	timeout = 60,
+	timeout = STATICPOPUP_TIMEOUT,
 	whileDead = 1,
 	hideOnEscape = 1
 };
@@ -1437,7 +1477,7 @@ StaticPopupDialogs["LEVEL_GRANT_PROPOSED"] = {
 	OnHide = function()
 		DeclineLevelGrant();
 	end,
-	timeout = 60,
+	timeout = STATICPOPUP_TIMEOUT,
 	whileDead = 1,
 	hideOnEscape = 1
 };
@@ -1495,7 +1535,7 @@ StaticPopupDialogs["CHAT_CHANNEL_PASSWORD"] = {
 	EditBoxOnEscapePressed = function(self)
 		self:GetParent():Hide();
 	end,
-	timeout = 60,
+	timeout = STATICPOPUP_TIMEOUT,
 	whileDead = 1,
 	hideOnEscape = 1
 };
@@ -1510,7 +1550,7 @@ StaticPopupDialogs["ARENA_TEAM_INVITE"] = {
 	OnCancel = function(self)
 		DeclineArenaTeam();
 	end,
-	timeout = 60,
+	timeout = STATICPOPUP_TIMEOUT,
 	whileDead = 1,
 	hideOnEscape = 1
 };
@@ -2150,7 +2190,7 @@ StaticPopupDialogs["DUEL_REQUESTED"] = {
 	OnCancel = function(self)
 		CancelDuel();
 	end,
-	timeout = 60,
+	timeout = STATICPOPUP_TIMEOUT,
 	hideOnEscape = 1
 };
 StaticPopupDialogs["DUEL_OUTOFBOUNDS"] = {
@@ -2167,7 +2207,20 @@ StaticPopupDialogs["UNLEARN_SKILL"] = {
 			TradeSkillFrame_Hide();
 		end
 	end,
-	timeout = 60,
+	timeout = STATICPOPUP_TIMEOUT,
+	exclusive = 1,
+	whileDead = 1,
+	showAlert = 1,
+	hideOnEscape = 1
+};
+StaticPopupDialogs["UNLEARN_SPECIALIZATION"] = {
+	text = UNLEARN_SKILL,
+	button1 = UNLEARN,
+	button2 = CANCEL,
+	OnAccept = function(self, index)
+		UnlearnSpecialization(index);
+	end,
+	timeout = STATICPOPUP_TIMEOUT,
 	exclusive = 1,
 	whileDead = 1,
 	showAlert = 1,
@@ -2962,6 +3015,49 @@ StaticPopupDialogs["CONFIRM_RANK_AUTHENTICATOR_REMOVE"] = {
 	hideOnEscape = 1,
 	whileDead = 1,
 };
+StaticPopupDialogs["VOID_DEPOSIT_CONFIRM"] = {
+	text = VOID_STORAGE_DEPOSIT_CONFIRMATION.."\n"..CONFIRM_CONTINUE,
+	button1 = OKAY,
+	button2 = CANCEL,
+	OnAccept = function(self)
+		VoidStorage_UpdateTransferButton();
+	end,
+	OnCancel = function(self)
+		VoidStorage_CloseConfirmationDialog(self.data.slot);
+	end,
+	timeout = 0,
+	exclusive = 1,
+	whileDead = 1,
+	hideOnEscape = 1,
+	hasItemFrame = 1
+};
+StaticPopupDialogs["TRANSMOGRIFY_BIND_CONFIRM"] = {
+	text = TRANSMOGRIFY_BIND_CONFIRMATION.."\n"..CONFIRM_CONTINUE,
+	button1 = OKAY,
+	button2 = CANCEL,
+	OnAccept = function(self)
+		TransmogrifyFrame_UpdateApplyButton();
+	end,
+	OnCancel = function(self)
+		ClearTransmogrifySlot(self.data.slot);
+	end,
+	timeout = 0,
+	exclusive = 1,
+	whileDead = 1,
+	hideOnEscape = 1,
+	hasItemFrame = 1
+};
+
+StaticPopupDialogs["GUILD_IMPEACH"] = {
+	text = GUILD_IMPEACH_POPUP_TEXT ,
+	button1 = GUILD_IMPEACH_POPUP_CONFIRM,
+	button2 = CANCEL,
+	OnAccept = function (self) ReplaceGuildMaster(); end,
+	OnCancel = function (self) end,
+	hideOnEscape = 1,
+	timeout = 0,
+	exclusive = 1,
+}
 
 function StaticPopup_FindVisible(which, data)
 	local info = StaticPopupDialogs[which];
@@ -2999,6 +3095,8 @@ function StaticPopup_Resize(dialog, which)
 		width = width + (info.editBoxWidth - 260);
 	elseif ( which == "HELP_TICKET" ) then
 		width = 350;
+	elseif ( which == "GUILD_IMPEACH" ) then
+		width = 375;
 	end
 	if ( width > maxWidthSoFar )  then
 		dialog:SetWidth(width);

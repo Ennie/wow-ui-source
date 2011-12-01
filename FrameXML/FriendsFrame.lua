@@ -43,6 +43,7 @@ FRIENDS_FRIENDS_MUTUAL = 2;
 FRIENDS_FRIENDS_ALL = 3;
 BNET_CLIENT_WOW = "WoW";
 BNET_CLIENT_SC2 = "S2";
+BNET_CLIENT_D3 = "D3";
 FRIENDS_TOOLTIP_MAX_TOONS = 5;
 FRIENDS_TOOLTIP_MAX_WIDTH = 200;
 FRIENDS_TOOLTIP_MARGIN_WIDTH = 12;
@@ -74,16 +75,14 @@ function FriendsFrame_ShowSubFrame(frameName)
 	for index, value in pairs(FRIENDSFRAME_SUBFRAMES) do
 		if ( value == frameName ) then
 			_G[value]:Show()
+		elseif ( value == "RaidFrame" ) then
+			if ( RaidFrame:GetParent() == FriendsFrame ) then
+				RaidFrame:Hide();
+			end
 		else
 			_G[value]:Hide();
 		end	
 	end 
-end
-
-function FriendsFrame_SummonButton_OnEvent (self, event, ...)
-	if ( event == "SPELL_UPDATE_COOLDOWN" and self:GetParent().id ) then
-		FriendsFrame_SummonButton_Update(self);
-	end
 end
 
 function FriendsFrame_SummonButton_OnShow (self)
@@ -212,6 +211,7 @@ function FriendsFrame_OnLoad(self)
 	self:RegisterEvent("PLAYER_ENTERING_WORLD");
 	self:RegisterEvent("BN_CONNECTED");
 	self:RegisterEvent("BN_DISCONNECTED");
+	self:RegisterEvent("SPELL_UPDATE_COOLDOWN");
 	self.playersInBotRank = 0;
 	self.playerStatusFrame = 1;
 	self.selectedFriend = 1;
@@ -232,6 +232,19 @@ function FriendsFrame_OnLoad(self)
 		FriendsFrameBattlenetStatus:Hide();
 		FriendsFrameStatusDropDown:Show();
 	end	
+	
+	--Create lists of buttons for various subframes
+	for i = 2, 19 do
+		local button = CreateFrame("Button", "FriendsFrameIgnoreButton"..i, IgnoreListFrame, "FriendsFrameIgnoreButtonTemplate");
+		button:SetPoint("TOP", _G["FriendsFrameIgnoreButton"..(i-1)], "BOTTOM");
+	end
+	for i = 2, 17 do
+		local button = CreateFrame("Button", "WhoFrameButton"..i, WhoFrame, "FriendsFrameWhoButtonTemplate");
+		button:SetID(i);
+		button:SetPoint("TOP", _G["WhoFrameButton"..(i-1)], "BOTTOM");
+	end
+
+	
 end
 
 function FriendsFrame_OnShow()
@@ -244,36 +257,24 @@ end
 
 function FriendsFrame_Update()
 	if ( FriendsFrame.selectedTab == 1 ) then
+		ButtonFrameTemplate_ShowButtonBar(FriendsFrame);
+		FriendsFrameInset:SetPoint("TOPLEFT", 4, -83);
 		FriendsFrameIcon:SetTexture("Interface\\FriendsFrame\\Battlenet-Portrait");
 		FriendsTabHeader:Show();
 		if ( FriendsTabHeader.selectedTab == 1 ) then
 			ShowFriends();
-			FriendsFrameTopLeft:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-TopLeft-bnet");
-			FriendsFrameTopRight:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-TopRight-bnet");
-			FriendsFrameBottomLeft:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrameMute-BotLeft-bnet");
-			FriendsFrameBottomRight:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrameMute-BotRight-bnet");
 			FriendsFrameTitleText:SetText(FRIENDS_LIST);
 			FriendsFrame_ShowSubFrame("FriendsListFrame");
 		elseif ( FriendsTabHeader.selectedTab == 3 ) then
-			FriendsFrameTopLeft:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-TopLeft-bnet");
-			FriendsFrameTopRight:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-TopRight-bnet");		
-			FriendsFrameBottomRight:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-Pending-BotRight");
-			FriendsFrameBottomLeft:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-Pending-BotLeft");
 			FriendsFrameTitleText:SetText(PENDING_INVITE_LIST);
 			FriendsFrame_ShowSubFrame("PendingListFrame");
 		else
-			FriendsFrameTopLeft:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-TopLeft-bnet");
-			FriendsFrameTopRight:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-TopRight-bnet");
 			if ( IsVoiceChatEnabled() ) then
 				FriendsFrameMutePlayerButton:Show();
-				FriendsFrameBottomLeft:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrameThree-BotLeft-bnet");
-				FriendsFrameBottomRight:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrameThree-BotRight-bnet");
 				FriendsFrameIgnorePlayerButton:SetWidth(110);
 				FriendsFrameUnsquelchButton:SetWidth(111);
 			else
 				FriendsFrameMutePlayerButton:Hide();
-				FriendsFrameBottomLeft:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrameMute-BotLeft-bnet");
-				FriendsFrameBottomRight:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrameMute-BotRight-bnet");
 				FriendsFrameIgnorePlayerButton:SetWidth(131);
 				FriendsFrameUnsquelchButton:SetWidth(134);
 			end
@@ -284,29 +285,24 @@ function FriendsFrame_Update()
 	else
 		FriendsTabHeader:Hide();
 		if ( FriendsFrame.selectedTab == 2 ) then
+			ButtonFrameTemplate_ShowButtonBar(FriendsFrame);
+			FriendsFrameInset:SetPoint("TOPLEFT", 4, -80);
 			FriendsFrameIcon:SetTexture("Interface\\FriendsFrame\\Battlenet-Portrait");
-			FriendsFrameTopLeft:SetTexture("Interface\\ClassTrainerFrame\\UI-ClassTrainer-TopLeft");
-			FriendsFrameTopRight:SetTexture("Interface\\ClassTrainerFrame\\UI-ClassTrainer-TopRight");
-			FriendsFrameBottomLeft:SetTexture("Interface\\FriendsFrame\\WhoFrame-BotLeft");
-			FriendsFrameBottomRight:SetTexture("Interface\\FriendsFrame\\WhoFrame-BotRight");
 			FriendsFrameTitleText:SetText(WHO_LIST);
 			FriendsFrame_ShowSubFrame("WhoFrame");
 			WhoList_Update();
 		elseif ( FriendsFrame.selectedTab == 3 ) then
+			ButtonFrameTemplate_ShowButtonBar(FriendsFrame);
+			FriendsFrameInset:SetPoint("TOPLEFT", 4, -60);
 			FriendsFrameIcon:SetTexture("Interface\\FriendsFrame\\Battlenet-Portrait");
-			FriendsFrameTopLeft:SetTexture("Interface\\PaperDollInfoFrame\\UI-Character-General-TopLeft");
-			FriendsFrameTopRight:SetTexture("Interface\\PaperDollInfoFrame\\UI-Character-General-TopRight");
-			FriendsFrameBottomLeft:SetTexture("Interface\\FriendsFrame\\UI-ChannelFrame-BotLeft");
-			FriendsFrameBottomRight:SetTexture("Interface\\FriendsFrame\\UI-ChannelFrame-BotRight");
 			FriendsFrameTitleText:SetText(CHAT_CHANNELS);
 			FriendsFrame_ShowSubFrame("ChannelFrame");
 		elseif ( FriendsFrame.selectedTab == 4 ) then
+			ButtonFrameTemplate_ShowButtonBar(FriendsFrame);
+			FriendsFrameInset:SetPoint("TOPLEFT", 4, -60);
 			FriendsFrameIcon:SetTexture("Interface\\LFGFrame\\UI-LFR-PORTRAIT");
-			FriendsFrameTopLeft:SetTexture("Interface\\PaperDollInfoFrame\\UI-Character-General-TopLeft");
-			FriendsFrameTopRight:SetTexture("Interface\\PaperDollInfoFrame\\UI-Character-General-TopRight");
-			FriendsFrameBottomLeft:SetTexture("Interface\\PaperDollInfoFrame\\UI-Character-General-BottomLeft");
-			FriendsFrameBottomRight:SetTexture("Interface\\PaperDollInfoFrame\\UI-Character-General-BottomRight");
 			FriendsFrameTitleText:SetText(RAID);
+			ClaimRaidFrame(FriendsFrame);
 			FriendsFrame_ShowSubFrame("RaidFrame");
 		end
 	end
@@ -317,7 +313,13 @@ function FriendsFrame_OnHide()
 	PlaySound("igMainMenuClose");
 	RaidInfoFrame:Hide();
 	for index, value in pairs(FRIENDSFRAME_SUBFRAMES) do
-		_G[value]:Hide();
+		if ( value == "RaidFrame" ) then
+			if ( RaidFrame:GetParent() == FriendsFrame ) then
+				RaidFrame:Hide();
+			end
+		else
+			_G[value]:Hide();
+		end
 	end
 	FriendsFriendsFrame:Hide();
 end
@@ -863,7 +865,14 @@ function WhoFrameDropDownButton_OnClick(self)
 end
 
 function FriendsFrame_OnEvent(self, event, ...)
-	if ( event == "FRIENDLIST_SHOW" ) then
+	if ( event == "SPELL_UPDATE_COOLDOWN" and self:IsShown() ) then
+		local buttons = FriendsFrameFriendsScrollFrame.buttons;
+		for _, button in pairs(buttons) do
+			if ( button.summonButton:IsShown() ) then
+				FriendsFrame_SummonButton_Update(button.summonButton);
+			end
+		end
+	elseif ( event == "FRIENDLIST_SHOW" ) then
 		FriendsList_Update();
 		FriendsFrame_Update();
 	elseif ( event == "FRIENDLIST_UPDATE" or event == "PARTY_MEMBERS_CHANGED" ) then
@@ -1077,6 +1086,19 @@ function ToggleFriendsFrame(tab)
 			HideUIPanel(FriendsFrame);
 			return;
 		end
+		PanelTemplates_SetTab(FriendsFrame, tab);
+		if ( FriendsFrame:IsShown() ) then
+			FriendsFrame_OnShow();
+		else
+			ShowUIPanel(FriendsFrame);
+		end
+	end
+end
+
+function OpenFriendsFrame(tab)
+	if ( not tab ) then
+		ShowUIPanel(FriendsFrame);
+	else
 		PanelTemplates_SetTab(FriendsFrame, tab);
 		if ( FriendsFrame:IsShown() ) then
 			FriendsFrame_OnShow();
@@ -1318,10 +1340,27 @@ function FriendsFrame_UpdateFriends()
 				end
 				infoText = area;
 				button.gameIcon:Hide();
+				button.soRButton:Hide();
 				FriendsFrame_SummonButton_Update(button.summonButton);
 			elseif ( FriendButtons[index].buttonType == FRIENDS_BUTTON_TYPE_BNET ) then
-				local presenceID, givenName, surname, toonName, toonID, client, isOnline, lastOnline, isAFK, isDND, messageText, noteText = BNGetFriendInfo(FriendButtons[index].id);
+				local presenceID, givenName, surname, toonName, toonID, client, isOnline, lastOnline, isAFK, isDND, messageText, noteText, isRIDFriend, messageTime, canSoR = BNGetFriendInfo(FriendButtons[index].id);
 				broadcastText = messageText;
+				if ( givenName and surname ) then
+					if ( toonName ) then
+						if ( client == BNET_CLIENT_WOW and CanCooperateWithToon(toonID, hasTravelPass) ) then
+							nameText = string.format(BATTLENET_NAME_FORMAT, givenName, surname).." "..FRIENDS_WOW_NAME_COLOR_CODE.."("..toonName..")";
+						else
+							if ( ENABLE_COLORBLIND_MODE == "1" ) then
+								toonName = toonName..CANNOT_COOPERATE_LABEL;
+							end
+							nameText = string.format(BATTLENET_NAME_FORMAT, givenName, surname).." "..FRIENDS_OTHER_NAME_COLOR_CODE.."("..toonName..")";
+						end
+					else
+						nameText = string.format(BATTLENET_NAME_FORMAT, givenName, surname);
+					end
+				else
+					nameText = UNKNOWN;
+				end
 				if ( isOnline ) then
 					local _, _, _, realmName, realmID, faction, _, _, _, zoneName, _, gameText = BNGetToonInfo(toonID);
 					button.background:SetTexture(FRIENDS_BNET_BACKGROUND_COLOR.r, FRIENDS_BNET_BACKGROUND_COLOR.g, FRIENDS_BNET_BACKGROUND_COLOR.b, FRIENDS_BNET_BACKGROUND_COLOR.a);
@@ -1341,6 +1380,9 @@ function FriendsFrame_UpdateFriends()
 						button.gameIcon:SetTexture("Interface\\FriendsFrame\\Battlenet-WoWicon");
 					elseif ( client == BNET_CLIENT_SC2 ) then
 						button.gameIcon:SetTexture("Interface\\FriendsFrame\\Battlenet-Sc2icon");
+						infoText = gameText;
+					elseif ( client == BNET_CLIENT_D3 ) then
+						button.gameIcon:SetTexture("Interface\\FriendsFrame\\Battlenet-D3icon");
 						infoText = gameText;
 					end
 					nameColor = FRIENDS_BNET_NAME_COLOR;
@@ -1366,21 +1408,13 @@ function FriendsFrame_UpdateFriends()
 						infoText = string.format(BNET_LAST_ONLINE_TIME, FriendsFrame_GetLastOnline(lastOnline));
 					end
 				end
-				if ( givenName and surname ) then
-					if ( toonName ) then
-						if ( client == BNET_CLIENT_WOW and CanCooperateWithToon(toonID, hasTravelPass) ) then
-							nameText = string.format(BATTLENET_NAME_FORMAT, givenName, surname).." "..FRIENDS_WOW_NAME_COLOR_CODE.."("..toonName..")";
-						else
-							if ( ENABLE_COLORBLIND_MODE == "1" ) then
-								toonName = toonName..CANNOT_COOPERATE_LABEL;
-							end
-							nameText = string.format(BATTLENET_NAME_FORMAT, givenName, surname).." "..FRIENDS_OTHER_NAME_COLOR_CODE.."("..toonName..")";
-						end
-					else
-						nameText = string.format(BATTLENET_NAME_FORMAT, givenName, surname);
-					end
+				if ( canSoR ) then
+					button.soRButton:Show();
+					button.soRButton.type = "bn";
+					button.soRButton.target = presenceID;
+					button.soRButton.text = nameText;
 				else
-					nameText = UNKNOWN;
+					button.soRButton:Hide();
 				end
 				FriendsFrame_SummonButton_Update(button.summonButton);
 			else	-- header
@@ -1600,7 +1634,7 @@ function FriendsFrameTooltip_Show(self)
 				end
 				FriendsFrameTooltip_SetLine(FriendsTooltipToon1Name, nil, text);
 				anchor = FriendsFrameTooltip_SetLine(FriendsTooltipToon1Info, nil, string.format(FRIENDS_TOOLTIP_WOW_INFO_TEMPLATE, zoneName, realmName), -4);
-			elseif ( client == BNET_CLIENT_SC2 ) then
+			else
 				FriendsFrameTooltip_SetLine(FriendsTooltipToon1Name, nil, toonName);
 				anchor = FriendsFrameTooltip_SetLine(FriendsTooltipToon1Info, nil, gameText, -4);
 			end
@@ -1685,7 +1719,7 @@ function FriendsFrameTooltip_Show(self)
 						text = string.format(FRIENDS_TOOLTIP_WOW_TOON_TEMPLATE, toonName..CANNOT_COOPERATE_LABEL, level, race, class);
 					end
 					gameText = zoneName;
-				elseif ( client == BNET_CLIENT_SC2 ) then
+				else
 					text = toonName;
 				end
 				FriendsFrameTooltip_SetLine(toonNameString, nil, text);
@@ -2198,9 +2232,12 @@ function TravelPassDropDown_Initialize(self)
 			else
 				info.text = string.format(FRIENDS_TOOLTIP_WOW_TOON_TEMPLATE, toonName..CANNOT_COOPERATE_LABEL, level, race, class);
 			end
-		else
+		elseif ( client == BNET_CLIENT_SC2 ) then
 			restriction = INVITE_RESTRICTION_CLIENT;
 			info.text = "|TInterface\\ChatFrame\\UI-ChatIcon-SC2:18|t"..toonName;
+		elseif ( client == BNET_CLIENT_D3 ) then
+			restriction = INVITE_RESTRICTION_CLIENT;
+			info.text = "|TInterface\\ChatFrame\\UI-ChatIcon-D3:18|t"..toonName;
 		end
 		if ( restriction == INVITE_RESTRICTION_NONE ) then
 			info.arg1 = toonID;

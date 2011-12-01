@@ -1,3 +1,107 @@
+
+function SearchBoxTemplate_OnLoad(self)
+	self:SetText(SEARCH);
+	self:SetFontObject("GameFontDisable");
+	self.searchIcon:SetVertexColor(0.6, 0.6, 0.6);
+	self:SetTextInsets(16, 20, 0, 0);
+end
+
+function SearchBoxTemplate_OnEditFocusLost(self)
+	self:HighlightText(0, 0);
+	self:SetFontObject("GameFontDisable");
+	self.searchIcon:SetVertexColor(0.6, 0.6, 0.6);
+	if ( self:GetText() == "" or self:GetText() == SEARCH ) then
+		self:SetText(SEARCH);
+		self.clearButton:Hide();
+	end
+end
+
+function SerachBoxTemplate_OnEditFocusGained(self)
+	self:HighlightText();
+	self:SetFontObject("ChatFontSmall");
+	self.searchIcon:SetVertexColor(1.0, 1.0, 1.0);
+	if ( self:GetText() == SEARCH ) then
+		self:SetText("")
+	end
+	self.clearButton:Show();
+end
+
+ITEM_SEARCHBAR_LIST = {
+	"BagItemSearchBox",
+	"GuildItemSearchBox",
+	"VoidItemSearchBox",
+	"BankItemSearchBox",
+};
+
+function BagSearch_OnHide(self)
+	local allClosed = true;
+	for _,barName in pairs(ITEM_SEARCHBAR_LIST) do
+		local bar = _G[barName];
+		if bar and bar ~= self and bar:IsVisible() then
+			allClosed = false;
+		end
+	end
+	if ( allClosed ) then
+		self.clearButton:Click();
+		BagSearch_OnTextChanged(self);
+	end
+end
+
+function BagSearch_OnTextChanged(self, userChanged)
+	local text = self:GetText();
+	if ( text == SEARCH ) then
+		text = "";
+	end
+	SetItemSearch(text);
+	if (text ~= "") then
+		self.clearButton:Show();
+	else
+		self.clearButton:Hide();
+	end
+end
+
+function BagSearch_OnChar(self, text)
+	-- clear focus if the player is repeating keys (ie - trying to move)
+	-- TODO: move into base editbox code?
+	local MIN_REPEAT_CHARACTERS = 3
+	local searchString = self:GetText();
+	if (string.len(searchString) > MIN_REPEAT_CHARACTERS) then
+		local repeatChar = true;
+		for i=1, MIN_REPEAT_CHARACTERS, 1 do 
+			if ( string.sub(searchString,(0-i), (0-i)) ~= string.sub(searchString,(-1-i),(-1-i)) ) then
+				repeatChar = false;
+				break;
+			end
+		end
+		if ( repeatChar ) then
+			self:ClearFocus();
+		end
+	end
+end
+
+function BagSearch_OnEditFocusGained(self)
+	SerachBoxTemplate_OnEditFocusGained(self);
+
+	for _,barName in pairs(ITEM_SEARCHBAR_LIST) do
+		local bar = _G[barName];
+		if bar and bar ~= self then
+			bar:SetText(SEARCH);
+		end
+	end
+end
+
+function BagSearch_OnEditFocusLost(self)
+	SerachBoxTemplate_OnEditFocusGained(self);
+
+	local search = self:GetText();
+	for _,barName in pairs(ITEM_SEARCHBAR_LIST) do
+		local bar = _G[barName];
+		if bar and bar ~= self then
+			bar:SetText(search);
+		end
+	end
+end
+
 -- functions to manage tab interfaces where only one tab of a group may be selected
 function PanelTemplates_Tab_OnClick(self, frame)
 	PanelTemplates_SetTab(frame, self:GetID())
@@ -300,13 +404,16 @@ function ScrollFrame_OnScrollRangeChanged(self, xrange, yrange)
 			_G[self:GetName().."ScrollBar"]:Hide();
 			_G[scrollbar:GetName().."ScrollDownButton"]:Hide();
 			_G[scrollbar:GetName().."ScrollUpButton"]:Hide();
+			_G[scrollbar:GetName().."ThumbTexture"]:Hide();
 		else
 			_G[scrollbar:GetName().."ScrollDownButton"]:Disable();
 			_G[scrollbar:GetName().."ScrollUpButton"]:Disable();
 			_G[scrollbar:GetName().."ScrollDownButton"]:Show();
 			_G[scrollbar:GetName().."ScrollUpButton"]:Show();
+			if ( not self.noScrollThumb ) then
+				_G[scrollbar:GetName().."ThumbTexture"]:Show();
+			end
 		end
-		_G[scrollbar:GetName().."ThumbTexture"]:Hide();
 	else
 		_G[scrollbar:GetName().."ScrollDownButton"]:Show();
 		_G[scrollbar:GetName().."ScrollUpButton"]:Show();
@@ -732,6 +839,10 @@ function CapProgressBar_SetNotches(capBar, count)
 end
 
 function CapProgressBar_Update(capBar, cap1Quantity, cap1Limit, cap2Quantity, cap2Limit, totalQuantity, totalLimit, hasNoSharedStats)
+	if ( totalLimit == 0) then
+		return;
+	end
+	
 	local barWidth = capBar:GetWidth();
 	local sizePerPoint = barWidth / totalLimit;
 	local progressWidth = totalQuantity * sizePerPoint;

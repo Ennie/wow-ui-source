@@ -4,6 +4,12 @@ NUM_RAID_GROUPS = 8;
 MEMBERS_PER_RAID_GROUP = 5;
 MAX_RAID_INFOS = 20;
 
+function RaidParentFrame_OnLoad(self)
+	SetPortraitToTexture(self.portrait, "Interface\\LFGFrame\\UI-LFR-PORTRAIT");
+	PanelTemplates_SetNumTabs(self, 3);
+	PanelTemplates_SetTab(self, 1);
+end
+
 function RaidFrame_OnLoad(self)
 	self:RegisterEvent("PLAYER_LOGIN");
 	self:RegisterEvent("RAID_ROSTER_UPDATE");
@@ -22,6 +28,16 @@ function RaidFrame_OnLoad(self)
 	RaidFrame_Update();
 
 	RaidFrame.hasRaidInfo = nil;
+	RaidParentFrame.selectectTab = 1;
+end
+
+function RaidFrame_OnShow(self)
+	ButtonFrameTemplate_ShowAttic(self:GetParent());
+	self:GetParent().TitleText:SetText(RAID);
+	
+	RaidFrame_Update();
+	RequestRaidInfo();
+	UpdateMicroButtons();
 end
 
 function RaidFrame_OnEvent(self, event, ...)
@@ -60,6 +76,35 @@ function RaidFrame_OnEvent(self, event, ...)
 	elseif ( event == "PARTY_MEMBERS_CHANGED" or event == "PARTY_LEADER_CHANGED" or
 		event == "VOICE_STATUS_UPDATE" or event == "PARTY_LFG_RESTRICTED" ) then
 		RaidFrame_Update();
+	end
+end
+
+function RaidParentFrame_SetView(tab)
+	if ( tab == 1 ) then
+		RaidParentFrame.selectectTab = 1;
+		if ( RaidFrame:GetParent() == RaidParentFrame ) then
+			RaidFrame:Hide();
+		end
+		LFRParentFrame:Hide();
+		RaidFinderFrame:Show();
+		PanelTemplates_Tab_OnClick(RaidParentFrameTab1, RaidParentFrame);
+	end
+	if ( tab == 2 ) then
+		RaidParentFrame.selectectTab = 2;
+		RaidFinderFrame:Hide();
+		LFRParentFrame:Hide();
+		ClaimRaidFrame(RaidParentFrame);
+		RaidFrame:Show();
+		PanelTemplates_Tab_OnClick(RaidParentFrameTab2, RaidParentFrame);
+	elseif ( tab == 3 ) then
+		RaidParentFrame.selectectTab = 3;
+		RaidFinderFrame:Hide();
+		if ( RaidFrame:GetParent() == RaidParentFrame ) then
+			RaidFrame:Hide();
+		end
+		LFRParentFrame:Show();
+		LFRFrame_SetActiveTab(LFRParentFrame.activeTab);
+		PanelTemplates_Tab_OnClick(RaidParentFrameTab3, RaidParentFrame);
 	end
 end
 
@@ -230,3 +275,39 @@ function RaidInfoExtendButton_OnClick(self)
 	RequestRaidInfo();
 	RaidInfoFrame_Update();
 end
+
+
+
+
+
+
+--4.3 Temp - Chaz
+function ClaimRaidFrame(parent)
+	local currentParent = RaidFrame:GetParent();
+	if currentParent == parent then
+		return;
+	end
+	
+	RaidFrame:SetParent(parent);
+	RaidFrame:ClearAllPoints();
+	RaidFrame:SetPoint("TOPLEFT", 0, 0);
+	RaidFrame:SetPoint("BOTTOMRIGHT", 0, 0);
+	
+	if RaidFrame:IsShown() and currentParent then
+		-- more hackiness - Serban
+		if ( currentParent == RaidParentFrame ) then
+			if ( RaidParentFrameTab1:IsEnabled() ) then
+				RaidParentFrame_SetView(1);
+			else
+				RaidParentFrame_SetView(3);
+			end
+		else
+			_G[currentParent:GetName().."Tab1"]:Click();
+		end
+	end
+end
+
+
+
+
+

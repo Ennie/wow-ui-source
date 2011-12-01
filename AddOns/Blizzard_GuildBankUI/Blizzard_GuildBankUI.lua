@@ -8,7 +8,7 @@ NUM_GUILDBANK_COLUMNS = 7;
 MAX_TRANSACTIONS_SHOWN = 21;
 GUILDBANK_TRANSACTION_HEIGHT = 13;
 
-UIPanelWindows["GuildBankFrame"] = { area = "doublewide", pushable = 0, width = 769 };
+UIPanelWindows["GuildBankFrame"] = { area = "doublewide", pushable = 0, width = 793 };
 
 --REMOVE ME!
 TABARDBACKGROUNDUPPER = "Textures\\GuildEmblems\\Background_%s_TU_U";
@@ -94,6 +94,7 @@ function GuildBankFrame_OnLoad(self)
 	self:RegisterEvent("GUILDBANK_UPDATE_TEXT");
 	self:RegisterEvent("GUILDBANK_TEXT_CHANGED");
 	self:RegisterEvent("PLAYER_MONEY");
+	self:RegisterEvent("INVENTORY_SEARCH_UPDATE");
 	-- Set the button id's
 	local index, column, button;
 	for i=1, MAX_GUILDBANK_SLOTS_PER_TAB do
@@ -159,6 +160,8 @@ function GuildBankFrame_OnEvent(self, event, ...)
 		if ( GuildBankFrameBuyInfo:IsShown() ) then
 			GuildBankFrame_UpdateTabBuyingInfo();
 		end
+	elseif ( event == "INVENTORY_SEARCH_UPDATE" ) then	
+		GuildBankFrame_UpdateFiltered()
 	end
 end
 
@@ -222,7 +225,7 @@ function GuildBankFrame_Update()
 
 		-- Update the tab items		
 		local button, index, column;
-		local texture, itemCount, locked;
+		local texture, itemCount, locked, isFiltered;
 		for i=1, MAX_GUILDBANK_SLOTS_PER_TAB do
 			index = mod(i, NUM_SLOTS_PER_GUILDBANK_GROUP);
 			if ( index == 0 ) then
@@ -231,10 +234,16 @@ function GuildBankFrame_Update()
 			column = ceil((i-0.5)/NUM_SLOTS_PER_GUILDBANK_GROUP);
 			button = _G["GuildBankColumn"..column.."Button"..index];
 			button:SetID(i);
-			texture, itemCount, locked = GetGuildBankItemInfo(tab, i);
+			texture, itemCount, locked, isFiltered = GetGuildBankItemInfo(tab, i);
 			SetItemButtonTexture(button, texture);
 			SetItemButtonCount(button, itemCount);
 			SetItemButtonDesaturated(button, locked);
+			
+			if ( isFiltered ) then
+				button.searchOverlay:Show();
+			else
+				button.searchOverlay:Hide();
+			end
 		end
 		MoneyFrame_Update("GuildBankMoneyFrame", GetGuildBankMoney());
 		if ( CanWithdrawGuildBankMoney() ) then
@@ -264,6 +273,33 @@ function GuildBankFrame_Update()
 	--Update remaining money
 	GuildBankFrame_UpdateWithdrawMoney();
 end
+
+
+function GuildBankFrame_UpdateFiltered()
+	--Figure out which mode you're in and which tab is selected
+	if ( GuildBankFrame.mode == "bank" ) then
+		-- Update the tab items
+		local tab = GetCurrentGuildBankTab();
+		local button, index, column;
+		local _, isFiltered;
+		for i=1, MAX_GUILDBANK_SLOTS_PER_TAB do
+			index = mod(i, NUM_SLOTS_PER_GUILDBANK_GROUP);
+			if ( index == 0 ) then
+				index = NUM_SLOTS_PER_GUILDBANK_GROUP;
+			end
+			column = ceil((i-0.5)/NUM_SLOTS_PER_GUILDBANK_GROUP);
+			button = _G["GuildBankColumn"..column.."Button"..index];
+			_, _, _, isFiltered = GetGuildBankItemInfo(tab, i);
+			
+			if ( isFiltered ) then
+				button.searchOverlay:Show();
+			else
+				button.searchOverlay:Hide();
+			end
+		end
+	end
+end
+
 
 function GuildBankFrameTab_OnClick(tab, id, doNotUpdate)
 	PanelTemplates_SetTab(GuildBankFrame, id);
@@ -648,7 +684,11 @@ function GuildBankFrame_UpdateMoneyLog()
 		elseif ( type == "withdrawForTab" ) then
 			msg = format(GUILDBANK_WITHDRAWFORTAB_MONEY_FORMAT, name, money);
 		elseif ( type == "buyTab" ) then
-			msg = format(GUILDBANK_BUYTAB_MONEY_FORMAT, name, money);
+			if ( amount > 0 ) then
+				msg = format(GUILDBANK_BUYTAB_MONEY_FORMAT, name, money);
+			else
+				msg = format(GUILDBANK_UNLOCKTAB_FORMAT, name);
+			end
 		elseif ( type == "depositSummary" ) then
 			msg = format(GUILDBANK_AWARD_MONEY_SUMMARY_FORMAT, money);
 		end
@@ -744,23 +784,33 @@ function GuildBankFrame_UpdateTabInfo(tab)
 end
 
 --Popup functions
+local GB_ICON_FILENAMES = {};
+
+function GuildBankPopupFrame_RefreshIconList ()
+	GB_ICON_FILENAMES = {};
+	GB_ICON_FILENAMES[1] = "INV_MISC_QUESTIONMARK";
+
+	GetMacroItemIcons(GB_ICON_FILENAMES);
+	GetMacroIcons(GB_ICON_FILENAMES);
+end
+
 function GuildBankPopupFrame_Update(tab)
-	local numguildBankIcons = GetNumMacroItemIcons();
+	local numguildBankIcons = #GB_ICON_FILENAMES;
 	local guildBankPopupIcon, guildBankPopupButton;
 	local guildBankPopupOffset = FauxScrollFrame_GetOffset(GuildBankPopupScrollFrame);
 	local index;
 	
 	local _, tabTexture  = GetGuildBankTabInfo(GetCurrentGuildBankTab());
-	
+	tabTexture = gsub( strupper(tabTexture), "INTERFACE\\ICONS\\", "")
 	-- Icon list
 	local texture;
 	for i=1, NUM_GUILDBANK_ICONS_SHOWN do
 		guildBankPopupIcon = _G["GuildBankPopupButton"..i.."Icon"];
 		guildBankPopupButton = _G["GuildBankPopupButton"..i];
 		index = (guildBankPopupOffset * NUM_GUILDBANK_ICONS_PER_ROW) + i;
-		texture = GetMacroItemIconInfo(index);
+		texture = GB_ICON_FILENAMES[index];
 		if ( index <= numguildBankIcons ) then
-			guildBankPopupIcon:SetTexture(texture);
+			guildBankPopupIcon:SetTexture("INTERFACE\\ICONS\\"..texture);
 			guildBankPopupButton:Show();
 		else
 			guildBankPopupIcon:SetTexture("");
@@ -782,7 +832,7 @@ function GuildBankPopupFrame_Update(tab)
 	--Only do this if the player hasn't clicked on an icon or the icon is not visible
 	if ( not GuildBankPopupFrame.selectedIcon ) then
 		for i=1, numguildBankIcons do
-			texture = GetMacroItemIconInfo(i);
+			texture = GB_ICON_FILENAMES[i];
 			if ( tabTexture == texture ) then
 				GuildBankPopupFrame.selectedIcon = i;
 				break;
@@ -801,6 +851,13 @@ function GuildBankPopupFrame_OnShow(self)
 	end
 	GuildBankPopupEditBox:SetText(name);
 	GuildBankPopupFrame.selectedIcon = nil;
+	GuildBankPopupFrame_RefreshIconList();
+end
+
+function GuildBankPopupFrame_OnHide(self)
+	PlaySound("igCharacterInfoTab");
+	GB_ICON_FILENAMES = nil;
+	collectgarbage();
 end
 
 function GuildBankPopupButton_OnClick(self, button)
@@ -816,7 +873,13 @@ function GuildBankPopupOkayButton_OnClick(self)
 	if ( not name or name == "" ) then
 		name = format(GUILDBANK_TAB_NUMBER, tab);
 	end
-	SetGuildBankTabInfo(tab, name, GuildBankPopupFrame.selectedIcon);
+	local iconTexture = GB_ICON_FILENAMES[GuildBankPopupFrame.selectedIcon];
+	if ( not iconTexture ) then
+		local _, texture = GetGuildBankTabInfo(tab);
+		iconTexture = gsub( strupper(texture), "INTERFACE\\ICONS\\", "");
+	end
+		
+	SetGuildBankTabInfo(tab, name, iconTexture);
 	GuildBankPopupFrame:Hide();
 end
 

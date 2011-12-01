@@ -83,6 +83,73 @@ function ActionBar_PageDown()
 	ChangeActionBarPage(prevPage);
 end
 
+function ActionBarButtonEventsFrame_OnLoad(self)
+	self.frames = { };
+	self:RegisterEvent("PLAYER_ENTERING_WORLD");
+	self:RegisterEvent("ACTIONBAR_SHOWGRID");
+	self:RegisterEvent("ACTIONBAR_HIDEGRID");
+	self:RegisterEvent("ACTIONBAR_PAGE_CHANGED");
+	self:RegisterEvent("ACTIONBAR_SLOT_CHANGED");
+	self:RegisterEvent("UPDATE_BINDINGS");
+	self:RegisterEvent("UPDATE_SHAPESHIFT_FORM");
+	self:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN");
+end
+
+function ActionBarButtonEventsFrame_OnEvent(self, event, ...)
+	if ( event == "ACTIONBAR_UPDATE_COOLDOWN" ) then
+		if ( self.tooltipOwner and GameTooltip:GetOwner() == self.tooltipOwner ) then
+			ActionButton_SetTooltip(self.tooltipOwner);
+		end
+	else
+		for k, frame in pairs(self.frames) do
+			ActionButton_OnEvent(frame, event, ...);
+		end
+	end
+end
+
+function ActionBarButtonEventsFrame_RegisterFrame(frame)
+	tinsert(ActionBarButtonEventsFrame.frames, frame);
+end
+
+function ActionBarActionEventsFrame_OnLoad(self)
+	self.frames = { };
+	--self:RegisterEvent("ACTIONBAR_UPDATE_STATE");			not updating state from lua anymore, see SetActionUIButton
+	self:RegisterEvent("ACTIONBAR_UPDATE_USABLE");
+	--self:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN");		not updating cooldown from lua anymore, see SetActionUIButton
+	self:RegisterEvent("UPDATE_INVENTORY_ALERTS");
+	self:RegisterEvent("PLAYER_TARGET_CHANGED");
+	self:RegisterEvent("TRADE_SKILL_SHOW");
+	self:RegisterEvent("TRADE_SKILL_CLOSE");
+	self:RegisterEvent("ARCHAEOLOGY_CLOSED");
+	self:RegisterEvent("PLAYER_ENTER_COMBAT");
+	self:RegisterEvent("PLAYER_LEAVE_COMBAT");
+	self:RegisterEvent("START_AUTOREPEAT_SPELL");
+	self:RegisterEvent("STOP_AUTOREPEAT_SPELL");
+	self:RegisterEvent("UNIT_ENTERED_VEHICLE");
+	self:RegisterEvent("UNIT_EXITED_VEHICLE");
+	self:RegisterEvent("COMPANION_UPDATE");
+	self:RegisterEvent("UNIT_INVENTORY_CHANGED");
+	self:RegisterEvent("LEARNED_SPELL_IN_TAB");
+	self:RegisterEvent("PET_STABLE_UPDATE");
+	self:RegisterEvent("PET_STABLE_SHOW");
+	self:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW");
+	self:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE");
+end
+
+function ActionBarActionEventsFrame_OnEvent(self, event, ...)
+	for k, frame in pairs(self.frames) do
+		ActionButton_OnEvent(frame, event, ...);
+	end
+end
+
+function ActionBarActionEventsFrame_RegisterFrame(frame)
+	ActionBarActionEventsFrame.frames[frame] = frame;
+end
+
+function ActionBarActionEventsFrame_UnregisterFrame(frame)
+	ActionBarActionEventsFrame.frames[frame] = nil;
+end
+
 function ActionButton_OnLoad (self)
 	self.flashing = 0;
 	self.flashtime = 0;
@@ -94,13 +161,7 @@ function ActionButton_OnLoad (self)
 	self:SetAttribute("useparent-actionpage", true);
 	self:RegisterForDrag("LeftButton", "RightButton");
 	self:RegisterForClicks("AnyUp");
-	self:RegisterEvent("PLAYER_ENTERING_WORLD");
-	self:RegisterEvent("ACTIONBAR_SHOWGRID");
-	self:RegisterEvent("ACTIONBAR_HIDEGRID");
-	self:RegisterEvent("ACTIONBAR_PAGE_CHANGED");
-	self:RegisterEvent("ACTIONBAR_SLOT_CHANGED");
-	self:RegisterEvent("UPDATE_BINDINGS");
-	self:RegisterEvent("UPDATE_SHAPESHIFT_FORM");
+	ActionBarButtonEventsFrame_RegisterFrame(self);
 	ActionButton_UpdateAction(self);
 	ActionButton_UpdateHotkeys(self, self.buttonType);
 end
@@ -125,11 +186,9 @@ function ActionButton_UpdateHotkeys (self, actionButtonType)
 	local text = GetBindingText(key, "KEY_", 1);
     if ( text == "" ) then
         hotkey:SetText(RANGE_INDICATOR);
-        hotkey:SetPoint("TOPLEFT", self, "TOPLEFT", 1, -2);
         hotkey:Hide();
     else
         hotkey:SetText(text);
-        hotkey:SetPoint("TOPLEFT", self, "TOPLEFT", -2, -2);
         hotkey:Show();
     end
 end
@@ -148,6 +207,8 @@ function ActionButton_CalculateAction (self, button)
 					offset = BonusActionBarFrame.lastBonusBar;
 				end
 				page = NUM_ACTIONBAR_PAGES + offset;
+			elseif ( self.isExtra ) then
+				page = NUM_ACTIONBAR_PAGES + GetExtraBarOffset();
 			elseif ( self.buttonType == "MULTICASTACTIONBUTTON" ) then
 				page = NUM_ACTIONBAR_PAGES + GetMultiCastBarOffset();
 			end
@@ -162,6 +223,7 @@ function ActionButton_UpdateAction (self)
 	local action = ActionButton_CalculateAction(self);
 	if ( action ~= self.action ) then
 		self.action = action;
+		SetActionUIButton(self, action, self.cooldown);
 		ActionButton_Update(self);
 	end
 end
@@ -176,27 +238,7 @@ function ActionButton_Update (self)
 
 	if ( HasAction(action) ) then
 		if ( not self.eventsRegistered ) then
-			self:RegisterEvent("ACTIONBAR_UPDATE_STATE");
-			self:RegisterEvent("ACTIONBAR_UPDATE_USABLE");
-			self:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN");
-			self:RegisterEvent("UPDATE_INVENTORY_ALERTS");
-			self:RegisterEvent("PLAYER_TARGET_CHANGED");
-			self:RegisterEvent("TRADE_SKILL_SHOW");
-			self:RegisterEvent("TRADE_SKILL_CLOSE");
-			self:RegisterEvent("ARCHAEOLOGY_CLOSED");
-			self:RegisterEvent("PLAYER_ENTER_COMBAT");
-			self:RegisterEvent("PLAYER_LEAVE_COMBAT");
-			self:RegisterEvent("START_AUTOREPEAT_SPELL");
-			self:RegisterEvent("STOP_AUTOREPEAT_SPELL");
-			self:RegisterEvent("UNIT_ENTERED_VEHICLE");
-			self:RegisterEvent("UNIT_EXITED_VEHICLE");
-			self:RegisterEvent("COMPANION_UPDATE");
-			self:RegisterEvent("UNIT_INVENTORY_CHANGED");
-			self:RegisterEvent("LEARNED_SPELL_IN_TAB");
-			self:RegisterEvent("PET_STABLE_UPDATE");
-			self:RegisterEvent("PET_STABLE_SHOW");
-			self:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW");
-			self:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE");
+			ActionBarActionEventsFrame_RegisterFrame(self);
 			self.eventsRegistered = true;
 		end
 
@@ -209,27 +251,7 @@ function ActionButton_Update (self)
 		ActionButton_UpdateFlash(self);
 	else
 		if ( self.eventsRegistered ) then
-			self:UnregisterEvent("ACTIONBAR_UPDATE_STATE");
-			self:UnregisterEvent("ACTIONBAR_UPDATE_USABLE");
-			self:UnregisterEvent("ACTIONBAR_UPDATE_COOLDOWN");
-			self:UnregisterEvent("UPDATE_INVENTORY_ALERTS");
-			self:UnregisterEvent("PLAYER_TARGET_CHANGED");
-			self:UnregisterEvent("TRADE_SKILL_SHOW");
-			self:UnregisterEvent("ARCHAEOLOGY_CLOSED");
-			self:UnregisterEvent("TRADE_SKILL_CLOSE");
-			self:UnregisterEvent("PLAYER_ENTER_COMBAT");
-			self:UnregisterEvent("PLAYER_LEAVE_COMBAT");
-			self:UnregisterEvent("START_AUTOREPEAT_SPELL");
-			self:UnregisterEvent("STOP_AUTOREPEAT_SPELL");
-			self:UnregisterEvent("UNIT_ENTERED_VEHICLE");
-			self:UnregisterEvent("UNIT_EXITED_VEHICLE");
-			self:UnregisterEvent("COMPANION_UPDATE");
-			self:UnregisterEvent("UNIT_INVENTORY_CHANGED");
-			self:UnregisterEvent("LEARNED_SPELL_IN_TAB");
-			self:UnregisterEvent("PET_STABLE_UPDATE");
-			self:UnregisterEvent("PET_STABLE_SHOW");
-			self:UnregisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW");
-			self:UnregisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE");
+			ActionBarActionEventsFrame_UnregisterFrame(self)
 			self.eventsRegistered = nil;
 		end
 
@@ -242,19 +264,23 @@ function ActionButton_Update (self)
 
 	-- Add a green border if button is an equipped item
 	local border = _G[name.."Border"];
-	if ( IsEquippedAction(action) ) then
-		border:SetVertexColor(0, 1.0, 0, 0.35);
-		border:Show();
-	else
-		border:Hide();
+	if border then
+		if ( IsEquippedAction(action) ) then
+			border:SetVertexColor(0, 1.0, 0, 0.35);
+			border:Show();
+		else
+			border:Hide();
+		end
 	end
 
 	-- Update Action Text
 	local actionName = _G[name.."Name"];
-	if ( not IsConsumableAction(action) and not IsStackableAction(action) ) then
-		actionName:SetText(GetActionText(action));
-	else
-		actionName:SetText("");
+	if actionName then
+		if ( not IsConsumableAction(action) and not IsStackableAction(action) ) then
+			actionName:SetText(GetActionText(action));
+		else
+			actionName:SetText("");
+		end
 	end
 
 	-- Update icon and hotkey text
@@ -262,12 +288,10 @@ function ActionButton_Update (self)
 		icon:SetTexture(texture);
 		icon:Show();
 		self.rangeTimer = -1;
-		self:SetNormalTexture("Interface\\Buttons\\UI-Quickslot2");
 	else
 		icon:Hide();
 		buttonCooldown:Hide();
 		self.rangeTimer = nil;
-		self:SetNormalTexture("Interface\\Buttons\\UI-Quickslot");
 		local hotkey = _G[name.."HotKey"];
         if ( hotkey:GetText() == RANGE_INDICATOR ) then
 			hotkey:Hide();
@@ -297,8 +321,10 @@ function ActionButton_ShowGrid (button)
 		button:SetAttribute("showgrid", button:GetAttribute("showgrid") + 1);
 	end
 
-	_G[button:GetName().."NormalTexture"]:SetVertexColor(1.0, 1.0, 1.0, 0.5);
-
+	if ( _G[button:GetName().."NormalTexture"] ) then
+		_G[button:GetName().."NormalTexture"]:SetVertexColor(1.0, 1.0, 1.0, 0.5);
+	end
+	
 	if ( button:GetAttribute("showgrid") >= 1 and not button:GetAttribute("statehidden") ) then
 		button:Show();
 	end
@@ -335,6 +361,10 @@ function ActionButton_UpdateUsable (self)
 	local name = self:GetName();
 	local icon = _G[name.."Icon"];
 	local normalTexture = _G[name.."NormalTexture"];
+	if ( not normalTexture ) then
+		return;
+	end
+	
 	local isUsable, notEnoughMana = IsUsableAction(self.action);
 	if ( isUsable ) then
 		icon:SetVertexColor(1.0, 1.0, 1.0);
@@ -364,9 +394,8 @@ function ActionButton_UpdateCount (self)
 end
 
 function ActionButton_UpdateCooldown (self)
-	local cooldown = _G[self:GetName().."Cooldown"];
 	local start, duration, enable = GetActionCooldown(self.action);
-	CooldownFrame_SetTimer(cooldown, start, duration, enable);
+	CooldownFrame_SetTimer(self.cooldown, start, duration, enable);
 end
 
 --Overlay stuff
@@ -385,6 +414,13 @@ function ActionButton_UpdateOverlayGlow(self)
 	local spellType, id, subType  = GetActionInfo(self.action);
 	if ( spellType == "spell" and IsSpellOverlayed(id) ) then
 		ActionButton_ShowOverlayGlow(self);
+	elseif ( spellType == "macro" ) then
+		local _, _, spellId = GetMacroSpell(id);
+		if ( spellId and IsSpellOverlayed(spellId) ) then
+			ActionButton_ShowOverlayGlow(self);
+		else
+			ActionButton_HideOverlayGlow(self);
+		end
 	else
 		ActionButton_HideOverlayGlow(self);
 	end
@@ -448,7 +484,7 @@ function ActionButton_OnEvent (self, event, ...)
 		ActionButton_Update(self);
 		return;
 	end
-	if ( event == "ACTIONBAR_PAGE_CHANGED" or event == "UPDATE_BONUS_ACTIONBAR" ) then
+	if ( event == "ACTIONBAR_PAGE_CHANGED" or event == "UPDATE_BONUS_ACTIONBAR" or event == "UPDATE_EXTRA_ACTIONBAR" ) then
 		ActionButton_UpdateAction(self);
 		local actionType, id, subType = GetActionInfo(self.action);
 		if ( actionType == "spell" and id == 0 ) then
@@ -510,11 +546,21 @@ function ActionButton_OnEvent (self, event, ...)
 		local actionType, id, subType = GetActionInfo(self.action);
 		if ( actionType == "spell" and id == arg1 ) then
 			ActionButton_ShowOverlayGlow(self);
+		elseif ( actionType == "macro" ) then
+			local _, _, spellId = GetMacroSpell(id);
+			if ( spellId and spellId == arg1 ) then
+				ActionButton_ShowOverlayGlow(self);
+			end
 		end
 	elseif ( event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" ) then
 		local actionType, id, subType = GetActionInfo(self.action);
 		if ( actionType == "spell" and id == arg1 ) then
 			ActionButton_HideOverlayGlow(self);
+		elseif ( actionType == "macro" ) then
+			local _, _, spellId = GetMacroSpell(id);
+			if (spellId and spellId == arg1 ) then
+				ActionButton_HideOverlayGlow(self);
+			end
 		end
 	end
 end
@@ -626,6 +672,10 @@ function ActionButton_IsFlashing (self)
 end
 
 function ActionButton_UpdateFlyout(self)
+	if not self.FlyoutArrow then
+		return;
+	end
+
 	local actionType = GetActionInfo(self.action);
 	if (actionType == "flyout") then
 		-- Update border and determine arrow position

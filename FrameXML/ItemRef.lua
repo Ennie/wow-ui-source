@@ -194,6 +194,9 @@ function SetItemRef(link, text, button, chatFrame)
 		return;
 	elseif ( strsub(link, 1, 7) == "journal" ) then
 		if ( not HandleModifiedItemClick(GetFixedLink(text)) ) then
+			if ( not EncounterJournal ) then
+				EncounterJournal_LoadUI();
+			end
 			EncounterJournal_OpenJournalLink(strsplit(":", link));
 		end
 		return;

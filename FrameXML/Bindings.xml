@@ -206,6 +206,10 @@
 		end
 	</Binding>
 	
+	<Binding name="EXTRAACTIONBUTTON1" runOnUp="true">
+		ExtraActionButtonKey(1, keystate == "down")
+	</Binding>
+	
 	<Binding name="SHAPESHIFTBUTTON1">
 		ShapeshiftBar_ChangeForm(1)
 	</Binding>
@@ -705,14 +709,17 @@
 	<Binding name="TOGGLECHATTAB">
 		ToggleFriendsFrame(3);
 	</Binding>
+	<Binding name="TOGGLERAIDFINDER">
+		ToggleRaidFrame(1);
+	</Binding>
 	<Binding name="TOGGLERAIDTAB">
-		ToggleFriendsFrame(4);
+		ToggleRaidFrame(2);
+	</Binding>
+	<Binding name="TOGGLELFRPARENT">
+		ToggleRaidFrame(3);
 	</Binding>
 	<Binding name="TOGGLELFGPARENT"> <!--Keeping the name as the old LFG so that people's bindings aren't reset -->
 		ToggleLFDParentFrame();
-	</Binding>
-	<Binding name="TOGGLELFRPARENT">
-		ToggleLFRParentFrame();
 	</Binding>
 	<Binding name="TOGGLEWORLDSTATESCORES">
 		ToggleWorldStateScoreFrame();
@@ -736,7 +743,7 @@
 		ToggleCharacter("TokenFrame");
 	</Binding>
 	<Binding name="TOGGLEENCOUNTERJOURNAL">
-		ToggleFrame(EncounterJournal);
+		ToggleEncounterJournal();
 	</Binding>
 
 	<!-- Misc -->
